@@ -161,6 +161,9 @@ const defaultData = () => ({
   workLogs: [],         // 工作日志 {date,place,mileage,content,weather}
   forestOwned: [],      // 林地台账-自营林 {region,forest,block,code,area,terrain,areaA..D,manager...}
   forestCoop: []        // 林地台账-合作林 {region,forest,county,village,farmer,mode,oldCode,newCode,area,year,manager...}
+  ,
+  contracts: [],        // 工序验收-合同库 {id,contractNo,areaName,farm,contractor,signDate,manager,siteOwner,note}
+  acceptanceRecords: [] // 工序验收记录 {id,contractNo,orderNo,plotCode,location,process,areaName,farm,signDate,applyDate,contractArea,actualArea,startPlan,startActual,endPlan,endActual,acceptApplyDate,forestDeadline,onsiteDate,manager,siteOwner,contractor,signCheck1..3,rStart,rEnd,rForest,rOnsite,qualityResult,opinion,photoType,createdAt,files:[]}
 });
 let DB = load();
 function load(){
@@ -261,6 +264,7 @@ const NAV = [
   {hash:"#/burn",    icon:"焚", label:"清点焚烧登记"},
   {hash:"#/inspect", icon:"改", label:"林场整改台账"},
   {hash:"#/seedling",icon:"苗", label:"苗木成活率"},
+  {hash:"#/acceptance",icon:"验", label:"工序验收表"},
   {hash:"#/archive", icon:"档", label:"验收资料台账"},
   {group:"总结"},
   {hash:"#/summary-month", icon:"▦", label:"月度总结"},
@@ -813,6 +817,173 @@ function saveCloud(){
     .then(res=>{ if(res.ok){ toast("连接成功，云同步已启用"); renderSettings(); doSync(true); } else toast("连接失败("+res.status+")：请检查 Token 权限和仓库名"); })
     .catch(()=>toast("网络错误：无法连接 GitHub"));
 }
+/* ================= 工序验收表（生成 xlsx/docx 到本地目录） ================= */
+let accForm = { editId: null };
+function accDir(){ return (DB.settings && DB.settings.acceptanceDir) || "D:\\A太阳纸业\\1色本东林区-刘琪伟\\1工序验收\\验收表"; }
+function accF(v, def){ return (v===undefined||v===null||v==="") ? (def===undefined?"":def) : v; }
+function accI(id, label, ph, val, def){
+  return `<div class="field"><label>${label}</label><input id="${id}" placeholder="${ph||""}" value="${accF(val,def)}" style="width:100%"></div>`;
+}
+function accD(id, label, val){ return accI(id, label, "YYYY-MM-DD", val); }
+function renderAcceptance(){
+  const cs = DB.contracts || [];
+  const f = accForm;
+  const recs = (DB.acceptanceRecords||[]).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const sel = f.contractNo ? cs.find(c=>c.contractNo===f.contractNo) : null;
+  const opts = cs.map(c=>`<option value="${c.contractNo}" ${f.contractNo===c.contractNo?"selected":""}>${c.contractNo}｜${c.contractor||""}</option>`).join("");
+  view.innerHTML = `
+    <div class="topbar"><h1>工序验收表</h1>
+      <div class="btns"><button class="btn primary" onclick="genAcceptance()">生成表格并保存</button></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h3>${f.editId ? "编辑验收单 #" + f.editId : "新建验收单"}</h3>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:8px">保存目录：${accDir()}（可在「设置」里修改）｜ 生成后自动存到 验收表/{月}/{合同号}/ 下</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px 12px">
+        <div class="field"><label>合同号（选或手填）</label>
+          <select id="acContract" onchange="accPickContract()" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px"><option value="">— 从合同库选择 —</option>${opts}</select>
+        </div>
+        <div class="field"><label>合同号（手填）</label><input id="acContractNew" placeholder="如 LWBD-WGC-20251228" value="${sel?sel.contractNo:(f.contractNo||"")}" style="width:100%"></div>
+        ${accI("acOrderNo","订单号","如 30","", f.orderNo)}
+        ${accI("acLocation","林场及位置","如 班更阿活","", f.location)}
+        ${accI("acPlot","年份林代码","如 S05-A5-19-26-G","", f.plotCode)}
+        ${accI("acProcess","作业工序","如 带状铲草2","", f.process)}
+        ${accI("acAreaName","林区","","", f.areaName, "色奔东")}
+        ${accI("acFarm","林场","如 班更","", f.farm)}
+        ${accD("acSignDate","订单签订日期", f.signDate)}
+        ${accD("acApplyDate","营林系统申请验收日期", f.applyDate)}
+        ${accI("acContractArea","合同面积/t","数字","", f.contractArea)}
+        ${accI("acActualArea","实际面积/t","数字","", f.actualArea)}
+        ${accD("acStartPlan","约定开工日期", f.startPlan)}
+        ${accD("acStartActual","实际开工日期", f.startActual)}
+        ${accD("acEndPlan","约定完工日期", f.endPlan)}
+        ${accD("acEndActual","实际完工日期", f.endActual)}
+        ${accD("acAcceptApply","验收群申请验收日期", f.acceptApplyDate)}
+        ${accD("acForestDeadline","林场最迟申请验收日期", f.forestDeadline)}
+        ${accD("acOnsite","考核部现场验收日期", f.onsiteDate)}
+        ${accI("acManager","林区经理","","", f.manager)}
+        ${accI("acSiteOwner","现场责任人","","", f.siteOwner)}
+        ${accI("acContractor","包商","","", f.contractor)}
+        ${accI("acSignCheck","签名一致属实","默认：签名是否一致属实 是","", f.signCheck1, "签名是否一致属实 是")}
+        ${accI("acRStart","开工验收结果","达标","", f.rStart, "达标")}
+        ${accI("acREnd","完工验收结果","提前完工","", f.rEnd, "提前完工")}
+        ${accI("acRForest","申请时限结果","达标","", f.rForest, "达标")}
+        ${accI("acROnsite","现场验收结果","达标","", f.rOnsite, "达标")}
+        ${accI("acQuality","质量标准结果","合格","", f.qualityResult, "合格")}
+        ${accI("acOpinion","考核部验收意见","作业质量验收合格","", f.opinion, "作业质量验收合格")}
+        ${accI("acPhoto","照片类型","实地验收图片（验收合格）","", f.photoType, "实地验收图片（验收合格）")}
+      </div>
+      <div class="btns" style="margin-top:10px">
+        <button class="btn primary" onclick="genAcceptance()">生成表格并保存</button>
+        <button class="btn" onclick="saveContract()">把合同信息存入合同库</button>
+        ${f.editId?`<button class="btn" onclick="accForm={editId:null};renderAcceptance()">取消编辑</button>`:""}
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h3>验收记录（${recs.length}）</h3>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:8px">记录用于追溯和重新生成；已生成的 xlsx/docx 在下方目录中。</div>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto">
+        ${recs.length?recs.map(r=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px"><b>${r.contractNo}-${r.orderNo}</b> ｜ ${r.process||""}<br><span style="font-size:12px;color:var(--sub)">${r.location||""}${r.plotCode||""} ｜ 现场验收 ${r.onsiteDate||"—"} ｜ ${r.files&&r.files.length?("已生成 "+r.files.length+" 个文件"):"未生成"}</span></div>
+          <div class="btns">
+            <button class="btn" onclick="fillAcceptance(${r.id})">编辑</button>
+            <button class="btn primary" onclick="genAcceptance(${r.id})">重新生成</button>
+            <button class="btn" onclick="delRec('acceptanceRecords',${DB.acceptanceRecords.indexOf(r)})">删除</button>
+          </div></div>`).join(""):`<div style="color:var(--sub);font-size:13px">还没有验收记录</div>`}
+      </div>
+    </div>
+    <div class="card">
+      <h3>合同库（${cs.length}）</h3>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:8px">合同号输过一次后，林区/林场/包商/经理/责任人自动带出。</div>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto">
+        ${cs.length?cs.map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px"><b>${c.contractNo}</b> ｜ ${c.contractor||"—"}<br><span style="font-size:12px;color:var(--sub)">${c.areaName||""} ${c.farm||""} ｜ 签订 ${c.signDate||"—"}</span></div>
+          <div class="btns">
+            <button class="btn" onclick="fillContract('${c.contractNo}')">用于新单</button>
+            <button class="btn" onclick="delContract('${c.contractNo}')">删除</button>
+          </div></div>`).join(""):`<div style="color:var(--sub);font-size:13px">合同库为空——填好上面的合同信息后点「把合同信息存入合同库」</div>`}
+      </div>
+    </div>`;
+}
+function accPickContract(){
+  const no = document.getElementById("acContract").value;
+  const c = (DB.contracts||[]).find(x=>x.contractNo===no);
+  if(c){
+    document.getElementById("acContractNew").value = c.contractNo;
+    if(c.areaName) document.getElementById("acAreaName").value = c.areaName;
+    if(c.farm) document.getElementById("acFarm").value = c.farm;
+    if(c.contractor) document.getElementById("acContractor").value = c.contractor;
+    if(c.manager) document.getElementById("acManager").value = c.manager;
+    if(c.siteOwner) document.getElementById("acSiteOwner").value = c.siteOwner;
+    if(c.signDate) document.getElementById("acSignDate").value = c.signDate;
+  }
+}
+function fillContract(no){
+  accForm = { editId:null, contractNo:no };
+  const c = (DB.contracts||[]).find(x=>x.contractNo===no);
+  if(c){ accForm.areaName=c.areaName; accForm.farm=c.farm; accForm.contractor=c.contractor;
+         accForm.manager=c.manager; accForm.siteOwner=c.siteOwner; accForm.signDate=c.signDate; }
+  renderAcceptance();
+  setTimeout(()=>{ document.getElementById("acContract").value = no; }, 0);
+}
+function saveContract(){
+  const no = document.getElementById("acContractNew").value.trim();
+  if(!no){ toast("请先填写合同号"); return; }
+  const c = { id:no, contractNo:no,
+    areaName: document.getElementById("acAreaName").value.trim(),
+    farm: document.getElementById("acFarm").value.trim(),
+    contractor: document.getElementById("acContractor").value.trim(),
+    manager: document.getElementById("acManager").value.trim(),
+    siteOwner: document.getElementById("acSiteOwner").value.trim(),
+    signDate: document.getElementById("acSignDate").value.trim() };
+  DB.contracts = DB.contracts || [];
+  const i = DB.contracts.findIndex(x=>x.contractNo===no);
+  if(i>=0) DB.contracts[i] = c; else DB.contracts.push(c);
+  save(); toast("已存入合同库： " + no); renderAcceptance();
+}
+function delContract(no){ if(confirm("删除合同 " + no + "？")){ DB.contracts = (DB.contracts||[]).filter(x=>x.contractNo!==no); save(); renderAcceptance(); } }
+function fillAcceptance(id){
+  const r = (DB.acceptanceRecords||[]).find(x=>x.id===id);
+  if(r){ accForm = Object.assign({}, r); accForm.editId = id; }
+  renderAcceptance();
+}
+function collectAcceptance(){
+  const g = id=>{ const e=document.getElementById(id); return e?e.value.trim():""; };
+  return {
+    contractNo: g("acContractNew"), orderNo: g("acOrderNo"),
+    location: g("acLocation"), plotCode: g("acPlot"), process: g("acProcess"),
+    areaName: g("acAreaName"), farm: g("acFarm"),
+    signDate: g("acSignDate"), applyDate: g("acApplyDate"),
+    contractArea: g("acContractArea"), actualArea: g("acActualArea"),
+    startPlan: g("acStartPlan"), startActual: g("acStartActual"),
+    endPlan: g("acEndPlan"), endActual: g("acEndActual"),
+    acceptApplyDate: g("acAcceptApply"), forestDeadline: g("acForestDeadline"), onsiteDate: g("acOnsite"),
+    manager: g("acManager"), siteOwner: g("acSiteOwner"), contractor: g("acContractor"),
+    signCheck1: g("acSignCheck"), signCheck2: g("acSignCheck"), signCheck3: g("acSignCheck"),
+    rStart: g("acRStart"), rEnd: g("acREnd"), rForest: g("acRForest"), rOnsite: g("acROnsite"),
+    qualityResult: g("acQuality"), opinion: g("acOpinion"), photoType: g("acPhoto")
+  };
+}
+async function genAcceptance(editId){
+  const data = collectAcceptance();
+  if(!data.contractNo){ toast("请填写合同号"); return; }
+  if(!data.plotCode){ toast("请填写年份林代码"); return; }
+  const run = async ()=>{
+    if(!(window.wbNative && window.wbNative.isNative)){ toast("生成表格需要在桌面软件版中操作（手机版只做记录）"); return; }
+    toast("正在生成验收表…");
+    const r = await window.wbNative.generateAcceptance({ out_root: accDir(), data });
+    if(r.ok && r.data){
+      const rec = Object.assign({ id: Date.now(), createdAt: Date.now(), files: [r.data.xlsx, r.data.docx] }, data);
+      if(editId){ const i = DB.acceptanceRecords.findIndex(x=>x.id===editId); if(i>=0) DB.acceptanceRecords[i] = rec; }
+      else DB.acceptanceRecords.push(rec);
+      accForm = { editId: null }; save(); renderAcceptance();
+      toast("已生成：" + r.data.xlsx.replace(/\\/g,"/").split("/").slice(-3).join("/"));
+    } else {
+      toast("生成失败：" + (r.stderr ? r.stderr.replace(/\n/g," ").slice(0,60) : "请确认电脑已安装 Python"));
+    }
+  };
+  if(!editId && !accForm.editId && confirm("生成后会写入本地文件夹，并保存到验收记录。继续？")) await run();
+  else await run();
+}
 function renderSettings(){
   const th = (DB.settings && DB.settings.theme) || "light";
   const has = x=>Array.isArray(x)?x.length:0;
@@ -843,6 +1014,12 @@ function renderSettings(){
         <button class="btn" onclick="doSync(false)">立即同步</button>
       </div>
       <div class="kv" style="font-size:12px;color:var(--sub);margin-top:8px">${cloudEnabled()?"已启用 ｜ 上次同步 "+(syncLast()?new Date(syncLast()).toLocaleString():"—"):"未启用 ｜ 数据变更后约30秒自动上传"}</div>
+    </div>
+    <div class="card" style="max-width:680px;margin-bottom:14px">
+      <h3>工序验收表存放目录</h3>
+      <div class="kv" style="font-size:13px;color:var(--sub)">生成的验收表 xlsx/docx 会按 验收表/{月}/{合同号}/ 自动创建并保存到下面这个目录。</div>
+      <input type="text" id="accDirInput" value="${accDir()}" style="margin-top:8px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text)">
+      <div class="btns" style="margin-top:10px"><button class="btn primary" onclick="saveAccDir()">保存目录</button></div>
     </div>
     <div class="card" style="max-width:680px;margin-bottom:14px">
       <h3>数据管理</h3>
@@ -1008,6 +1185,12 @@ function saveSendKey(){
   const k = document.getElementById("sendKey").value.trim();
   DB.settings = DB.settings || {}; DB.settings.sendkey = k; save();
   toast(k?"SendKey 已保存":"已清空 SendKey");
+}
+function saveAccDir(){
+  const v = document.getElementById("accDirInput").value.trim();
+  if(!v){ toast("目录不能为空"); return; }
+  DB.settings = DB.settings || {}; DB.settings.acceptanceDir = v;
+  save(); toast("验收表存放目录已保存");
 }
 function saveWxGroup(){
   const k = document.getElementById("wxGroupUrl").value.trim();
@@ -1253,6 +1436,7 @@ function route(){
   else if(h==="#/burn") renderBurn();
   else if(h==="#/inspect") renderInspect();
   else if(h==="#/seedling") renderSeedling();
+  else if(h==="#/acceptance") renderAcceptance();
   else if(h==="#/archive") renderArchive();
   else if(h==="#/phrases") renderPhrases();
   else if(h==="#/settings") renderSettings();
