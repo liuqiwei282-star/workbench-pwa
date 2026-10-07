@@ -5,26 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>个人工作台</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle' fill='white'%3E台%3C/text%3E%3C/svg%3E">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="工作台">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="assets/xlsx.full.min.js"></script>
 <script src="assets/echarts.min.js"></script>
 <script src="assets/pptxgen.bundle.js"></script>
+<script src="assets/seed.js"></script>
 <style>
   :root{
     --bg:#f4f6f9; --card:#ffffff; --line:#e8ebf0; --text:#1f2937; --sub:#6b7280;
-    --blue:#2563eb; --blue-soft:#eff6ff; --green:#16a34a; --orange:#ea580c; --red:#dc2626;
+    --blue:#2563eb; --primary:#2563eb; --blue-soft:#eff6ff; --green:#16a34a; --orange:#ea580c; --red:#dc2626;
     --radius:12px;
+  }
+  [data-theme="dark"]{
+    --bg:#0f172a; --card:#1e293b; --line:#334155; --text:#e2e8f0; --sub:#94a3b8;
+    --blue:#60a5fa; --primary:#3b82f6; --blue-soft:#1e3a5f; --green:#34d399; --orange:#fb923c; --red:#f87171;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
   .layout{display:flex;min-height:100vh}
 
   /* ===== 侧边栏 ===== */
-  .sidebar{width:200px;background:#fff;border-right:1px solid var(--line);padding:20px 0;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .sidebar{width:200px;background:var(--card);border-right:1px solid var(--line);padding:20px 0;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
   .logo{font-size:17px;font-weight:700;color:var(--blue);padding:0 20px 16px;display:flex;align-items:center;gap:8px}
   .logo::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--blue)}
   .nav-group{font-size:11px;color:#9ca3af;padding:14px 20px 6px;letter-spacing:1px}
-  .nav-item{display:flex;align-items:center;gap:8px;padding:9px 20px;cursor:pointer;color:#374151;font-size:14px;border-left:3px solid transparent}
-  .nav-item:hover{background:#f3f4f6}
+  .nav-item{display:flex;align-items:center;gap:8px;padding:9px 20px;cursor:pointer;color:var(--text);font-size:14px;border-left:3px solid transparent}
+  .nav-item:hover{background:var(--blue-soft)}
   .nav-item.active{background:var(--blue-soft);color:var(--blue);border-left-color:var(--blue);font-weight:600}
 
   /* ===== 主区 ===== */
@@ -33,7 +45,7 @@
   .topbar h1{font-size:19px;font-weight:700}
   .topbar .date{color:var(--sub);font-size:13px;font-weight:400;margin-left:8px}
   .btns{display:flex;gap:8px;flex-wrap:wrap}
-  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;color:#374151}
+  .btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;color:var(--text)}
   .btn:hover{border-color:var(--blue);color:var(--blue)}
   .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
   .btn.primary:hover{background:#1d4ed8}
@@ -46,6 +58,14 @@
   .stat .num{font-size:26px;font-weight:700;margin-top:6px}
   .stat .num small{font-size:13px;font-weight:400;color:var(--sub)}
   .stat .hint{font-size:11px;color:#9ca3af;margin-top:4px}
+  .km-item{cursor:pointer;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:74px;text-align:center;transition:.15s}
+  .km-item:hover{border-color:var(--primary)}
+  .km-item.km-cur{background:var(--primary);border-color:var(--primary)}
+  .km-item.km-cur .km-m,.km-item.km-cur .km-v{color:#fff}
+  .km-item .km-m{font-size:12px;color:var(--sub)}
+  .km-item .km-v{font-size:16px;font-weight:700;margin-top:2px}
+  .km-grid{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .km-bar{font-size:13px;font-weight:600;color:var(--ink)}
 
   .grid2{display:grid;grid-template-columns:1fr 1.6fr;gap:14px;margin-bottom:18px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
@@ -56,14 +76,14 @@
 
   .progress-track{height:8px;background:#eef0f3;border-radius:4px;overflow:hidden;margin:10px 0 12px}
   .progress-bar{height:100%;background:var(--green);border-radius:4px;transition:width .3s}
-  .task-line{font-size:13px;color:#4b5563;margin:4px 0}
+  .task-line{font-size:13px;color:var(--text);margin:4px 0}
   .task-line.done{color:#9ca3af;text-decoration:line-through}
   .task-line .tag{font-size:11px;color:var(--orange);margin-left:6px}
 
   /* ===== 表格 ===== */
   table{width:100%;border-collapse:collapse;table-layout:fixed}
   th{font-size:12px;color:var(--sub);font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-  td{padding:9px 10px;border-bottom:1px solid #f0f2f5;font-size:13px}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:13px}
   tr:last-child td{border-bottom:none}
   .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px}
   .pill.ok{background:#dcfce7;color:#15803d}
@@ -73,7 +93,7 @@
   /* ===== 表单 ===== */
   form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
   .field label{display:block;font-size:12px;color:var(--sub);margin-bottom:4px}
-  .field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:#fff}
+  .field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:var(--card);color:var(--text)}
   .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue)}
   .field.full{grid-column:1/-1}
   .empty{color:#9ca3af;text-align:center;padding:30px 0;font-size:13px}
@@ -121,16 +141,93 @@ const KEY = "qingjian_workbench_v1";
 const defaultData = () => ({
   workRecords: [],   // {date, content, location, done}
   weathers: [],      // {date, morning, afternoon, low, high}
-  mileages: [],      // {date, km}
+  mileages: [],      // {date, km} 手动里程表读数
+  fuelRecords: [],   // {date, amount, note} 加油记录(元)
   subsidies: [],     // {date, type, amount, note}
-  weeklyTasks: []    // {text, done, note}
+  weeklyTasks: [],   // {text, done, note}
+  wageBatches: [],   // 临时工考勤批次 {id,name,range,kind,rate,totalDays,totalAmt,records:[{lao,name,village,days,amount}]}
+  fertilizerUsage: [],  // 自营林肥料使用(吨)
+  fertilizerIssue: [],  // 合作林肥料发放(袋)
+  fertilizerStock: [],  // 肥料库存(袋)
+  herbicideStock: [],   // 除草剂库存(箱)
+  herbicideUsage: [],   // 除草剂使用明细(箱)
+  herbicideList: [],    // 除草剂林班发放表
+  burnRecords: [],      // 清点焚烧 {date,place,type,count,status,note}
+  inspectRecords: [],   // 林场整改 {forest,point,issue,owner,foundDate,status,doneDate,note}
+  seedlingRecords: [],  // 苗木成活率 {date,forest,block,area,unit,planted,survived,note}
+  archiveRecords: [],   // 验收资料 {date,type,name,project,status,note}
+  phrases: [],          // 常用语库 {text,category}
+  seedlingUsage: [],    // 苗木使用 {region,forest,block,code,area,qty}
+  workLogs: [],         // 工作日志 {date,place,mileage,content,weather}
+  forestOwned: [],      // 林地台账-自营林 {region,forest,block,code,area,terrain,areaA..D,manager...}
+  forestCoop: []        // 林地台账-合作林 {region,forest,county,village,farmer,mode,oldCode,newCode,area,year,manager...}
 });
 let DB = load();
 function load(){
   try{ const raw = localStorage.getItem(KEY); if(raw) return Object.assign(defaultData(), JSON.parse(raw)); }catch(e){}
   return defaultData();
 }
-function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
+// 首次运行：合并预置业务数据（从 assets/seed.js，不覆盖用户已有数据）
+(function(){
+  const VER = 7;
+  if(window.SEED_DATA && DB._seedVer !== VER){
+    // 版本7：桌面软件版首次启动——迁移网页版完整数据（软件版带 assets/user-data.js，网页版无此文件自动跳过）
+    if(window.USER_DATA){
+      Object.keys(USER_DATA).forEach(k=>{ if(k==="_seedVer") return; DB[k] = USER_DATA[k]; });
+      Object.keys(SEED_DATA).forEach(k=>{ if(!DB[k] || !Array.isArray(DB[k]) || !DB[k].length) DB[k] = SEED_DATA[k]; });
+    }
+    Object.keys(SEED_DATA).forEach(k=>{
+      if(!DB[k]) DB[k] = [];
+      if(!DB[k].length) DB[k] = SEED_DATA[k];
+    });
+    // 版本4：工作日志按日期补全缺失/空内容（合并用户历史手填记录，不覆盖已有内容）
+    if(Array.isArray(DB.workLogs) && Array.isArray(SEED_DATA.workLogs)){
+      const byDate = {};
+      DB.workLogs.forEach(x=>{ byDate[x.date] = x; });
+      SEED_DATA.workLogs.forEach(r=>{
+        const ex = byDate[r.date];
+        if(!ex){ DB.workLogs.push(Object.assign({}, r)); byDate[r.date] = DB.workLogs[DB.workLogs.length-1]; }
+        else if(!ex.content && r.content){ ex.content = r.content; }
+      });
+    }
+    // 版本5：每日工作记录合并进工作日志（内容补全 + 完成状态迁移），统一为一个板块
+    if(Array.isArray(DB.workRecords) && DB.workRecords.length){
+      const byDate = {};
+      DB.workLogs.forEach(x=>{ byDate[x.date] = x; });
+      DB.workRecords.forEach(r=>{
+        if(!r.date || !(r.content||"").trim()) return;
+        const ex = byDate[r.date];
+        if(ex){
+          if(!ex.content) ex.content = r.content;
+          if(!ex.place && r.location) ex.place = r.location;
+          if(r.done) ex.done = true;
+        } else {
+          DB.workLogs.push({date:r.date, place:r.location||"", mileage:"", content:r.content, weather:"", done:r.done?true:false});
+          byDate[r.date] = DB.workLogs[DB.workLogs.length-1];
+        }
+      });
+      DB.workLogs.sort((a,b)=>a.date.localeCompare(b.date));
+    }
+    // 版本6：里程双向同步的存量回填——摩托车里程板块已有读数的日期，补到工作日志当天（有记录才补，不创建空记录）
+    if(Array.isArray(DB.mileages) && DB.mileages.length){
+      const kmByDate = {};
+      DB.mileages.forEach(m=>{ if(m.date && kmByDate[m.date]===undefined) kmByDate[m.date] = m.km; });
+      (DB.workLogs||[]).forEach(r=>{
+        if(!r.mileage && kmByDate[r.date] !== undefined) r.mileage = String(kmByDate[r.date]);
+      });
+    }
+    delete DB.workRecords;
+    DB._seedVer = VER; save();
+  }
+})();
+function save(skipSync){
+  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }
+  catch(e){ toast("保存失败：本地存储空间不足。请到「导出与导入」先导出备份，再清理旧数据后重试"); }
+  if(!skipSync && cloudEnabled()) scheduleSync();
+}
+// PWA：Service Worker 注册（https 部署后生效，手机可离线打开）；启动时自动拉取云数据
+if("serviceWorker" in navigator && location.protocol==="https:"){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+setTimeout(()=>{ if(cloudEnabled()) doSync(true); }, 1200);
 function toast(msg){
   const t = document.getElementById("toast");
   t.textContent = msg; t.classList.add("show");
@@ -139,6 +236,10 @@ function toast(msg){
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function monthStr(){ return todayStr().slice(0,7); }
 function esc(s){ return String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function fmtNum(n){ return String(Math.round(Number(n||0))).replace(/\B(?=(\d{3})+(?!\d))/g,","); }  // 基普千分位
+// 每日工作记录与工作日志已合并：统一从 workLogs 读取（有内容才算一条记录）
+function dayLogs(ds){ return (DB.workLogs||[]).filter(x=>x.date===ds && (x.content||x.place||x.mileage)); }
+function hasDayLog(ds){ return dayLogs(ds).length > 0; }
 
 /* ================= 导航配置 ================= */
 const NAV = [
@@ -153,11 +254,23 @@ const NAV = [
   {hash:"#/plan",   icon:"▤", label:"本周工作计划"},
   {group:"生活"},
   {hash:"#/subsidy",icon:"¥", label:"就餐与补贴"},
+  {group:"业务台账"},
+  {hash:"#/wage",    icon:"工", label:"临时工考勤发薪"},
+  {hash:"#/material",icon:"肥", label:"物资台账(肥料/除草剂)"},
+  {hash:"#/forest",  icon:"林", label:"林地台账"},
+  {hash:"#/burn",    icon:"焚", label:"清点焚烧登记"},
+  {hash:"#/inspect", icon:"改", label:"林场整改台账"},
+  {hash:"#/seedling",icon:"苗", label:"苗木成活率"},
+  {hash:"#/archive", icon:"档", label:"验收资料台账"},
   {group:"总结"},
   {hash:"#/summary-month", icon:"▦", label:"月度总结"},
   {hash:"#/summary-year",  icon:"★", label:"年度总结"},
+  {group:"工具"},
+  {hash:"#/phrases", icon:"语", label:"常用语库"},
   {group:"数据"},
   {hash:"#/backup", icon:"⇪", label:"导出与导入"},
+  {group:"系统"},
+  {hash:"#/settings", icon:"⚙", label:"设置"},
 ];
 function renderNav(){
   document.getElementById("nav").innerHTML = NAV.map(n=>{
@@ -169,24 +282,46 @@ function renderNav(){
 
 /* ================= 统计计算 ================= */
 function monthItems(arr){ const m = monthStr(); return arr.filter(x=>x.date && x.date.startsWith(m)); }
-// 里程表是累计读数：总里程=最新读数；当月里程=本月最新读数-本月开始前最近一次读数
-function totalKm(){
-  const ms = DB.mileages.slice().sort((a,b)=>a.date.localeCompare(b.date));
-  return ms.length ? Number(ms[ms.length-1].km) : 0;
+// —— 里程统一时间线：工作日志「车辆里程」+ 摩托车里程板块读数合并（同一里程表，同日取手动记录优先）——
+function allKms(){
+  const m = {};
+  (DB.workLogs||[]).forEach(x=>{
+    if(x.mileage){
+      const km = parseFloat(String(x.mileage).replace(/[^\d.]/g,""));
+      if(!isNaN(km) && km>0) m[x.date] = {date:x.date, km, src:"wl"};
+    }
+  });
+  (DB.mileages||[]).forEach(x=>{
+    const km = Number(x.km);
+    if(!isNaN(km) && km>0) m[x.date] = {date:x.date, km, src:"mi"};
+  });
+  return Object.values(m).sort((a,b)=>a.date.localeCompare(b.date));
 }
+// 总里程=最新读数（合并时间线）
+function totalKm(){
+  const kms = allKms();
+  return kms.length ? kms[kms.length-1].km : 0;
+}
+// 某月行驶 = 该月最后读数 - 该月之前最近一次读数（无上月则用该月第一条）
 function monthKm(ym){
-  const ms = DB.mileages.slice().sort((a,b)=>a.date.localeCompare(b.date));
-  const inMonth = ms.filter(x=>x.date.startsWith(ym));
+  const kms = allKms();
+  const inMonth = kms.filter(x=>x.date.startsWith(ym));
   if(!inMonth.length) return 0;
-  const lastKm = Number(inMonth[inMonth.length-1].km);
-  const before = ms.filter(x=>x.date < ym+"-01");
-  const base = before.length ? Number(before[before.length-1].km) : Number(inMonth[0].km);
-  return lastKm - base;
+  const last = inMonth[inMonth.length-1].km;
+  const before = kms.filter(x=>x.date < ym+"-01");
+  const base = before.length ? before[before.length-1].km : inMonth[0].km;
+  return Math.max(0, last - base);
+}
+// 今年公里数：年初（1月1日）读数起，最新读数止
+function yearKm(){
+  const kms = allKms();
+  if(!kms.length) return 0;
+  return Math.max(0, kms[kms.length-1].km - kms[0].km);
 }
 function streakDays(){
   // 从今天往前数，连续有工作记录的天数
   let count = 0; const d = new Date();
-  const dates = new Set(DB.workRecords.map(x=>x.date));
+  const dates = new Set((DB.workLogs||[]).filter(x=>x.content||x.place||x.mileage).map(x=>x.date));
   for(let i=0;i<365;i++){
     const ds = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
     if(dates.has(ds)) count++; else if(i>0) break;
@@ -206,15 +341,17 @@ function weekRange(){
 const view = document.getElementById("view");
 
 function renderHome(){
-  const mr = monthItems(DB.workRecords);
+  const mr = (DB.workLogs||[]).filter(x=>x.date && x.date.startsWith(monthStr()) && (x.content||x.place||x.mileage));
   const doneCnt = mr.filter(x=>x.done).length;
   const rate = mr.length ? Math.round(doneCnt/mr.length*100) : 0;
   const kmTotal = totalKm();
   const kmMonth = monthKm(monthStr());
   const sub = monthItems(DB.subsidies).reduce((s,x)=>s+Number(x.amount||0),0);
+  const fuelM = (DB.fuelRecords||[]).filter(x=>x.date.startsWith(monthStr())).reduce((s,x)=>s+Number(x.amount||0),0);
+  const fuelY = (DB.fuelRecords||[]).filter(x=>x.date.startsWith(monthStr().slice(0,4))).reduce((s,x)=>s+Number(x.amount||0),0);
   const st = streakDays();
   const t = todayStr();
-  const todayWork = DB.workRecords.filter(x=>x.date===t);
+  const todayWork = (DB.workLogs||[]).filter(x=>x.date===t && (x.content||x.place||x.mileage));
   const todayWx = DB.weathers.find(x=>x.date===t);
 
   // 最近7天
@@ -224,14 +361,13 @@ function renderHome(){
     const ds = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
     const wd = ["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];
     const w = DB.weathers.find(x=>x.date===ds);
-    const cnt = DB.workRecords.filter(x=>x.date===ds);
-    const doneN = cnt.filter(x=>x.done).length;
+    const cnt = (DB.workLogs||[]).filter(x=>x.date===ds && (x.content||x.place||x.mileage));
     const s = DB.subsidies.filter(x=>x.date===ds).reduce((a,b)=>a+Number(b.amount||0),0);
     const hl = ds===t ? 'style="background:#fff7ed"' : "";
     rows += `<tr ${hl}>
       <td style="width:18%">${Number(ds.slice(5,7))}/${Number(ds.slice(8,10))} ${wd}</td>
       <td style="width:32%">${w?`上${w.morning} 下${w.afternoon} ${w.low}~${w.high}℃`:"—"}</td>
-      <td style="width:32%">${cnt.length?`${cnt.length} 条 / 完成 ${doneN}`:"—"}</td>
+      <td style="width:32%">${cnt.length?`${cnt.length} 条记录`:"—"}</td>
       <td style="width:18%">${s?`<span class="pill amt">¥${s}</span>`:"—"}</td>
     </tr>`;
   }
@@ -252,10 +388,13 @@ function renderHome(){
       </div>
     </div>
     <div class="stats">
-      <div class="stat"><div class="label">本月工作记录</div><div class="num">${mr.length}<small> 条</small></div><div class="hint">已完成 ${doneCnt} 条</div></div>
-      <div class="stat"><div class="label">本月任务完成率</div><div class="num">${rate}<small>%</small></div><div class="hint">${mr.length} 条记录</div></div>
+      <div class="stat"><div class="label">本月工作记录</div><div class="num">${mr.length}<small> 天</small></div><div class="hint">已完成 ${doneCnt} 天</div></div>
+      <div class="stat"><div class="label">本月完成率</div><div class="num">${rate}<small>%</small></div><div class="hint">${mr.length} 天有记录</div></div>
       <div class="stat"><div class="label">摩托车总里程</div><div class="num">${kmTotal.toFixed(1)}<small> km</small></div><div class="hint">里程表累计读数</div></div>
+      <div class="stat"><div class="label">今年公里数</div><div class="num">${yearKm().toFixed(1)}<small> km</small></div><div class="hint">今年至今行驶</div></div>
       <div class="stat"><div class="label">本月行驶里程</div><div class="num">${kmMonth.toFixed(1)}<small> km</small></div><div class="hint">较上月末新增</div></div>
+      <div class="stat"><div class="label">本月油费</div><div class="num">₭${fmtNum(fuelM)}</div><div class="hint">加油记录</div></div>
+      <div class="stat"><div class="label">年度油费</div><div class="num">₭${fmtNum(fuelY)}</div><div class="hint">加油记录</div></div>
       <div class="stat"><div class="label">本月生活补贴</div><div class="num">¥${sub}</div><div class="hint">${monthItems(DB.subsidies).length} 条登记</div></div>
       <div class="stat"><div class="label">连续记录</div><div class="num">${st}<small> 天</small></div><div class="hint">保持住</div></div>
     </div>
@@ -281,48 +420,6 @@ function renderHome(){
         ${rows}
       </table>
     </div>`;
-}
-
-/* ================= 工作记录 ================= */
-function renderWork(){
-  const list = DB.workRecords.slice().sort((a,b)=>b.date.localeCompare(a.date));
-  view.innerHTML = `
-    <div class="topbar"><h1>每日工作记录</h1></div>
-    <div class="card">
-      <form onsubmit="addWork(event)">
-        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
-        <div class="field full"><label>工作地点（点选常用，也可手动补充）</label>
-          <div class="loc-pick" id="locPick">
-            ${["班东","色奔","中心苗圃","孟农","公司"].map(l=>`<label><input type="checkbox" name="loc" value="${l}">${l}</label>`).join("")}
-          </div>
-          <input name="locOther" placeholder="其他地点（多个用顿号分隔，选填）" style="margin-top:8px">
-        </div>
-        <div class="field full"><label>工作内容</label><textarea name="content" rows="2" placeholder="今天做了什么？" required></textarea></div>
-        <div class="field"><label>状态</label><select name="done"><option value="1">已完成</option><option value="0">进行中</option></select></div>
-        <div class="field" style="align-self:end"><button class="btn primary" type="submit">保存记录</button></div>
-      </form>
-      <table>
-        <colgroup><col style="width:13%"><col style="width:22%"><col style="width:45%"><col style="width:12%"><col style="width:8%"></colgroup>
-        <tr><th>日期</th><th>工作地点</th><th>工作内容</th><th>状态</th><th></th></tr>
-        ${list.map((x,i)=>`<tr>
-          <td>${x.date}</td><td>${(x.locations||[x.location]).join("、")||"—"}</td><td>${esc(x.content)}</td>
-          <td>${x.done?'<span class="pill ok">完成</span>':'<span class="pill wait">进行中</span>'}</td>
-          <td><button class="btn danger" onclick="delRec('workRecords',${DB.workRecords.indexOf(x)})">删</button></td>
-        </tr>`).join("") || '<tr><td colspan="5" class="empty">还没有记录</td></tr>'}
-      </table>
-    </div>`;
-  // 多选样式切换
-  document.querySelectorAll("#locPick label").forEach(lb=>{
-    lb.addEventListener("click", e=>{ e.preventDefault(); const cb=lb.querySelector("input"); cb.checked=!cb.checked; lb.classList.toggle("on", cb.checked); });
-  });
-}
-function addWork(e){
-  e.preventDefault();
-  const f = e.target;
-  const locs = [...f.querySelectorAll("input[name=loc]:checked")].map(c=>c.value);
-  (f.locOther.value||"").split(/[、,，\s]+/).forEach(s=>{ if(s) locs.push(s); });
-  DB.workRecords.push({date:f.date.value, content:f.content.value, locations:locs, done:f.done.value==="1"});
-  save(); toast("已保存"); renderWork(); renderNav();
 }
 
 /* ================= 天气 ================= */
@@ -372,35 +469,111 @@ function addWeather(e){
 }
 
 /* ================= 里程 ================= */
+let kmFilter = "";  // 每月里程一览的选中月份（空=全部）
 function renderMileage(){
-  const list = DB.mileages.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const kms = allKms();              // 合并时间线（升序：工作日志里程 + 手动读数）
+  const desc = kms.slice().reverse();
+  const cur = monthStr();
+  // —— 每月里程一览（1~12月） ——
+  const months = [];
+  for(let m=1;m<=12;m++){ months.push(cur.slice(0,4)+"-"+String(m).padStart(2,"0")); }
+  const kmRows = months.map(ym=>{
+    const k = monthKm(ym);
+    return `<div class="km-item ${ym===kmFilter?"km-cur":""}" onclick="kmFilter=(kmFilter==='${ym}')?'':'${ym}';renderMileage()" title="点击查看该月每日里程，再点取消">
+      <div class="km-m">${+ym.split("-")[1]}月</div>
+      <div class="km-v">${k?k.toFixed(0)+" km":"—"}</div></div>`;
+  }).join("");
+  // —— 里程表读数表（工作日志每日里程 + 手动补录，同一里程表） ——
+  const rows = desc.filter(x=>!kmFilter || x.date.startsWith(kmFilter)).map((x,i)=>{
+    const prev = kms[kms.length-2-i];          // 时间线上更早一条
+    const diff = prev ? (x.km - prev.km).toFixed(1) : "—";
+    const src = x.src==="mi"
+      ? '<span class="pill" style="background:#eef2ff;color:#4f46e5">手动</span>'
+      : '<span class="pill" style="background:#f0fdf4;color:#16a34a">日志</span>';
+    const delBtn = x.src==="mi" ? `<button class="btn danger" onclick="delMileage('${x.date}')">删</button>` : "";
+    return `<tr><td>${x.date}</td><td>${x.km.toFixed(1)} km</td><td>${diff}</td><td>${src}</td><td>${delBtn}</td></tr>`;
+  }).join("");
+  // —— 加油记录统计 ——
+  const fuel = DB.fuelRecords||[];
+  const fm = fuel.filter(x=>x.date.startsWith(cur)).reduce((s,x)=>s+Number(x.amount||0),0);
+  const fy = fuel.filter(x=>x.date.startsWith(cur.slice(0,4))).reduce((s,x)=>s+Number(x.amount||0),0);
+  const fCount = fuel.filter(x=>x.date.startsWith(cur.slice(0,4))).length;
+  const fuelList = fuel.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>
+    `<tr><td>${x.date}</td><td><span class="pill amt">₭${fmtNum(x.amount)}</span></td><td>${esc(x.note||"")}</td>
+      <td><button class="btn danger" onclick="delRec('fuelRecords',${DB.fuelRecords.indexOf(x)})">删</button></td></tr>`).join("");
   view.innerHTML = `
     <div class="topbar"><h1>摩托车里程</h1></div>
     <div class="stats" style="margin-bottom:14px">
       <div class="stat"><div class="label">累计总里程</div><div class="num">${totalKm().toFixed(1)}<small> km</small></div></div>
-      <div class="stat"><div class="label">本月行驶</div><div class="num">${monthKm(monthStr()).toFixed(1)}<small> km</small></div></div>
+      <div class="stat"><div class="label">本月行驶</div><div class="num">${monthKm(cur).toFixed(1)}<small> km</small></div></div>
+      <div class="stat"><div class="label">今年公里数</div><div class="num">${yearKm().toFixed(1)}<small> km</small></div></div>
+    </div>
+    <div class="card">
+      <div class="km-bar">加油记录
+        <span style="float:right;font-weight:400;font-size:12px;color:var(--sub)">本月油费 <b style="color:var(--primary)">₭${fmtNum(fm)}</b> ｜ 年度油费 <b style="color:var(--primary)">₭${fmtNum(fy)}</b> ｜ 今年 ${fCount} 次</span>
+      </div>
+      <form onsubmit="addFuel(event)">
+        <div class="field"><label>加油日期</label><input type="date" name="date" value="${todayStr()}" required></div>
+        <div class="field"><label>加油金额 (基普)</label><input type="number" step="1" name="amount" required placeholder="如 100000"></div>
+        <div class="field"><label>备注</label><input name="note" placeholder="选填，如：加满 92号 3.5升"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">保存</button></div>
+      </form>
+      <table>
+        <colgroup><col style="width:20%"><col style="width:20%"><col style="width:47%"><col style="width:13%"></colgroup>
+        <tr><th>日期</th><th>金额</th><th>备注</th><th></th></tr>
+        ${fuelList || '<tr><td colspan="4" class="empty">还没有加油记录，加一次油就记一笔吧</td></tr>'}
+      </table>
+    </div>
+    <div class="card">
+      <div class="km-bar">每月里程一览（点击月份可查看该月每日里程）</div>
+      <div class="km-grid">${kmRows}</div>
     </div>
     <div class="card">
       <form onsubmit="addMileage(event)">
         <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
         <div class="field"><label>当前里程表读数 (km)</label><input type="number" step="0.1" name="km" required placeholder="如 19163.0"></div>
+        <div class="field"><label>备注</label><input name="note" placeholder="选填，如：补录10月3日"></div>
         <div class="field" style="align-self:end"><button class="btn primary" type="submit">保存</button></div>
       </form>
       <table>
-        <colgroup><col style="width:25%"><col style="width:35%"><col style="width:32%"><col style="width:8%"></colgroup>
-        <tr><th>日期</th><th>里程表读数</th><th>较上一次新增</th><th></th></tr>
-        ${list.map((x,i)=>{
-          const later = DB.mileages.filter(m=>m.date>x.date).sort((a,b)=>a.date.localeCompare(b.date))[0];
-          const diff = later ? (later.km - x.km).toFixed(1) : "—";
-          return `<tr><td>${x.date}</td><td>${Number(x.km).toFixed(1)} km</td><td>${diff}</td>
-            <td><button class="btn danger" onclick="delRec('mileages',${DB.mileages.indexOf(x)})">删</button></td></tr>`;
-        }).join("") || '<tr><td colspan="4" class="empty">还没有记录</td></tr>'}
+        <colgroup><col style="width:17%"><col style="width:25%"><col style="width:18%"><col style="width:12%"><col style="width:8%"></colgroup>
+        <tr><th>日期</th><th>里程表读数</th><th>较上一次新增</th><th>来源</th><th></th></tr>
+        ${rows || '<tr><td colspan="5" class="empty">该月还没有里程读数</td></tr>'}
       </table>
+      <div class="hint" style="margin-top:6px">绿色「日志」来自工作日志每日填写；蓝色「手动」为在本板块补录。任一处填写里程，都会自动同步到另一处。</div>
     </div>`;
+}
+/* 里程双向同步：任一板块填里程，另一板块自动补上（空值不覆盖已有数据） */
+function syncKmBoth(date, km){
+  if(!date || km==="" || km===null || km===undefined) return;
+  const v = Number(km);
+  if(!isNaN(v)){
+    const ex = DB.mileages.findIndex(x=>x.date===date);
+    if(ex>=0){ DB.mileages[ex].km = v; }
+    else DB.mileages.push({date, km:v, note:""});
+  }
+  const lg = DB.workLogs.find(x=>x.date===date);
+  if(lg && km!=="") lg.mileage = String(km);
 }
 function addMileage(e){
   e.preventDefault(); const f = e.target;
-  DB.mileages.push({date:f.date.value, km:Number(f.km.value)});
+  const date = f.date.value, km = Number(f.km.value), note = (f.note.value||"").trim();
+  const ex = DB.mileages.findIndex(x=>x.date===date);
+  if(ex>=0){ DB.mileages[ex].km = km; if(note) DB.mileages[ex].note = note; }
+  else DB.mileages.push({date, km, note});
+  const lg = DB.workLogs.find(x=>x.date===date);
+  if(lg) lg.mileage = String(km);
+  save(); toast("已保存并同步到工作日志"); renderMileage();
+}
+function delMileage(date){
+  if(!confirm("删除这条手动里程记录？")) return;
+  DB.mileages = DB.mileages.filter(x=>x.date!==date);
+  save(); toast("已删除"); renderMileage();
+}
+function addFuel(e){
+  e.preventDefault(); const f = e.target;
+  if(!DB.fuelRecords) DB.fuelRecords = [];
+  DB.fuelRecords.push({date:f.date.value, amount:Number(f.amount.value), note:(f.note.value||"").trim()});
   save(); toast("已保存"); renderMileage();
 }
 
@@ -489,8 +662,8 @@ function exportMonthExcel(){
     const col = (d-1) % 3;
     const rowBase = 2 + Math.floor((d-1)/3)*4;
     const ds = `${ym}-${String(d).padStart(2,"0")}`;
-    const works = DB.workRecords.filter(x=>x.date===ds);
-    const locSet = new Set(); works.forEach(x=>(x.locations||[]).forEach(l=>locSet.add(l)));
+    const works = dayLogs(ds);
+    const locSet = new Set(); works.forEach(x=>{ if(x.place) x.place.split(/[、,，]/).forEach(l=>l.trim()&&locSet.add(l.trim())); });
     const wx = DB.weathers.find(x=>x.date===ds);
     const mile = DB.mileages.filter(x=>x.date===ds).sort((a,b)=>b.km-a.km)[0];
     while(aoa.length < rowBase+4) aoa.push([]);
@@ -531,9 +704,9 @@ function importData(e){
 function clearAll(){ if(confirm("确定清空全部数据？此操作不可恢复！")){ localStorage.removeItem(KEY); DB=defaultData(); toast("已清空"); route(); } }
 function fillDemo(){
   const t = todayStr();
-  DB.workRecords = [
-    {date:t, content:"安全培训", location:"考核部办公室", done:true},
-    {date:t, content:"无人机设备录入准备", location:"祖晃林场", done:false},
+  DB.workLogs = [
+    {date:t, place:"考核部办公室", mileage:"", content:"安全培训", done:true},
+    {date:t, place:"祖晃林场", mileage:"", content:"无人机设备录入准备", done:false},
   ];
   DB.weathers = [{date:t, morning:"晴", afternoon:"晴", low:24, high:36}];
   DB.mileages = [{date:t, km:19163.0}];
@@ -542,10 +715,156 @@ function fillDemo(){
   save(); toast("已填充示例数据"); route();
 }
 
+/* ================= 设置 ================= */
+function applyTheme(){
+  const th = (DB.settings && DB.settings.theme) || "light";
+  document.body.setAttribute("data-theme", th);
+}
+function setTheme(th){
+  DB.settings = DB.settings || {}; DB.settings.theme = th; save();
+  applyTheme(); toast(th==="dark"?"已切换深色主题":"已切换浅色主题");
+}
+/* ================= 云同步（GitHub 数据仓库，手机/电脑自动同步） ================= */
+let syncTimer = null;
+function cloudCfg(){ return (DB.settings && DB.settings.cloud) || {}; }
+function cloudEnabled(){ const c = cloudCfg(); return !!(c.token && c.repo); }
+function syncLast(){ const s = DB.settings && DB.settings.sync; return s ? (s.last||0) : 0; }
+function scheduleSync(){
+  if(syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(doSync, 30000);
+}
+function ensureTs(){
+  Object.keys(DB).forEach(k=>{ if(Array.isArray(DB[k])) DB[k].forEach(r=>{ if(r && typeof r==="object" && r._ts===undefined) r._ts = Date.now(); }); });
+}
+function recKey(r, coll){
+  if(r && r.date) return "d:"+r.date;
+  if(r && r.id) return "i:"+r.id;
+  if(coll==="phrases") return "p:"+((r&&r.text)||"");
+  if(coll==="wageBatches") return "w:"+((r&&r.name)||"");
+  if(coll==="weeklyTasks") return "t:"+((r&&r.text)||"");
+  return "x:"+JSON.stringify(r||{}).slice(0,40);
+}
+function syncMerge(local, remote){
+  const out = {};
+  Object.keys(local).forEach(k=>{
+    if(k==="_seedVer" || k==="workRecords" || k==="settings"){ out[k] = local[k]; return; }
+    const a = Array.isArray(local[k]) ? local[k] : null;
+    const b = remote && Array.isArray(remote[k]) ? remote[k] : null;
+    if(a===null && b===null){ out[k] = local[k]; return; }
+    if(a===null){ out[k] = b; return; }
+    if(b===null){ out[k] = a; return; }
+    const m = new Map();
+    a.forEach(r=>{ const kk=recKey(r,k); if(!m.has(kk)) m.set(kk, r); });
+    b.forEach(r=>{
+      const kk=recKey(r,k);
+      const ex=m.get(kk);
+      if(!ex) m.set(kk, r);
+      else if(Number(r._ts||0) > Number(ex._ts||0)) m.set(kk, r);
+    });
+    out[k] = [...m.values()];
+  });
+  return out;
+}
+async function doSync(silent){
+  if(syncTimer){ clearTimeout(syncTimer); syncTimer = null; }
+  if(!cloudEnabled()) return;
+  const c = cloudCfg();
+  const url = "https://api.github.com/repos/" + c.repo + "/contents/data.json";
+  const headers = { Authorization: "Bearer " + c.token, Accept: "application/vnd.github+json" };
+  try{
+    ensureTs();
+    const res = await fetch(url, { headers });
+    let remote = null, sha = null;
+    if(res.status === 200){
+      const j = await res.json();
+      sha = j.sha;
+      try{ remote = JSON.parse(decodeURIComponent(escape(atob(j.content)))); }catch(e){ remote = null; }
+    } else if(res.status !== 404){ if(!silent) toast("云同步拉取失败("+res.status+")"); return; }
+    if(remote){
+      const merged = syncMerge(DB, remote);
+      const changed = JSON.stringify(merged) !== JSON.stringify(DB);
+      Object.keys(merged).forEach(k=>{ DB[k] = merged[k]; });
+      if(changed) save(true);
+    }
+    await pushData(sha);
+    DB.settings = DB.settings || {}; DB.settings.sync = { last: Date.now() }; save(true);
+    if(!silent) toast("云同步完成");
+  }catch(err){ if(!silent) toast("云同步失败："+String(err.message||err).slice(0,40)); }
+}
+async function pushData(sha){
+  const c = cloudCfg();
+  const body = { message: "sync " + new Date().toISOString(), branch: c.branch || "main",
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(DB)))) };
+  if(sha) body.sha = sha;
+  const res = await fetch("https://api.github.com/repos/" + c.repo + "/contents/data.json", {
+    method: "PUT",
+    headers: { Authorization: "Bearer " + c.token, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  if(res.status !== 200 && res.status !== 201) throw new Error("上传失败 " + res.status);
+}
+function saveCloud(){
+  const t = document.getElementById("ghToken").value.trim();
+  let r = document.getElementById("ghRepo").value.trim().replace(/^https:\/\/github\.com\//,"").replace(/\/$/,"");
+  const b = document.getElementById("ghBranch").value.trim() || "main";
+  DB.settings = DB.settings || {}; DB.settings.cloud = { token: t, repo: r, branch: b };
+  save(true);
+  if(!t || !r){ toast("已保存（未启用：需填 Token 和仓库）"); renderSettings(); return; }
+  fetch("https://api.github.com/repos/" + r, { headers: { Authorization: "Bearer " + t, Accept: "application/vnd.github+json" } })
+    .then(res=>{ if(res.ok){ toast("连接成功，云同步已启用"); renderSettings(); doSync(true); } else toast("连接失败("+res.status+")：请检查 Token 权限和仓库名"); })
+    .catch(()=>toast("网络错误：无法连接 GitHub"));
+}
+function renderSettings(){
+  const th = (DB.settings && DB.settings.theme) || "light";
+  const has = x=>Array.isArray(x)?x.length:0;
+  const logN = (DB.workLogs||[]).filter(r=>r.content||r.place||r.mileage).length;
+  view.innerHTML = `
+    <div class="topbar"><h1>设置</h1></div>
+    <div class="card" style="max-width:680px;margin-bottom:14px">
+      <h3>外观</h3>
+      <div class="btns">
+        <button class="btn ${th==="light"?"primary":""}" onclick="setTheme('light')">浅色</button>
+        <button class="btn ${th==="dark"?"primary":""}" onclick="setTheme('dark')">深色</button>
+      </div>
+    </div>
+    <div class="card" style="max-width:680px;margin-bottom:14px">
+      <h3>每日汇报发送</h3>
+      <div class="kv" style="font-size:13px;color:var(--sub)">Server酱 SendKey 用于把每日汇报推到微信（SCT 开头）。也可以到「每日汇报发微信」页设置。</div>
+      <input type="text" id="sendKey" placeholder="粘贴 Server酱 SendKey（SCT...）" value="${(DB.settings&&DB.settings.sendkey)||''}" style="margin-top:8px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text)">
+      <div class="btns" style="margin-top:10px"><button class="btn primary" onclick="saveSendKey()">保存</button></div>
+    </div>
+    <div class="card" style="max-width:680px;margin-bottom:14px">
+      <h3>云同步（手机/电脑自动同步）</h3>
+      <div class="kv" style="font-size:13px;color:var(--sub)">把数据自动同步到你的 GitHub 仓库：电脑和手机填的任何数据都会自动合并到一份。需要 GitHub 个人访问令牌（Token），只授权这一个数据仓库即可。</div>
+      <div class="field" style="margin-top:8px"><label>GitHub Token</label><input type="password" id="ghToken" placeholder="github_pat_... 或 ghp_..." value="${(DB.settings&&DB.settings.cloud&&DB.settings.cloud.token)||''}" style="background:var(--card);color:var(--text)"></div>
+      <div class="field" style="margin-top:8px"><label>仓库（owner/repo）</label><input id="ghRepo" placeholder="如：lqw/workbench-data" value="${(DB.settings&&DB.settings.cloud&&DB.settings.cloud.repo)||''}" style="background:var(--card);color:var(--text)"></div>
+      <div class="field" style="margin-top:8px"><label>分支</label><input id="ghBranch" placeholder="main" value="${(DB.settings&&DB.settings.cloud&&DB.settings.cloud.branch)||'main'}" style="background:var(--card);color:var(--text)"></div>
+      <div class="btns" style="margin-top:10px">
+        <button class="btn primary" onclick="saveCloud()">保存并测试连接</button>
+        <button class="btn" onclick="doSync(false)">立即同步</button>
+      </div>
+      <div class="kv" style="font-size:12px;color:var(--sub);margin-top:8px">${cloudEnabled()?"已启用 ｜ 上次同步 "+(syncLast()?new Date(syncLast()).toLocaleString():"—"):"未启用 ｜ 数据变更后约30秒自动上传"}</div>
+    </div>
+    <div class="card" style="max-width:680px;margin-bottom:14px">
+      <h3>数据管理</h3>
+      <div class="kv" style="font-size:13px;color:var(--sub)">所有数据都存在本机，换电脑或卸载前请先导出备份保存。</div>
+      <div class="btns" style="margin-top:10px">
+        <button class="btn" onclick="exportData()">导出数据备份 (JSON)</button>
+        <button class="btn" onclick="document.getElementById('setImportFile').click()">导入备份</button>
+        <input type="file" id="setImportFile" accept=".json" style="display:none" onchange="importData(event)">
+      </div>
+    </div>
+    <div class="card" style="max-width:680px">
+      <h3>关于</h3>
+      <div class="kv">个人工作台 v1.0.0（桌面版）</div>
+      <div class="kv" style="font-size:13px;color:var(--sub)">数据统计：工作日志 ${logN} 条 ｜ 林地台账 自营 ${has(DB.forestOwned)} 条 + 合作 ${has(DB.forestCoop)} 条 ｜ 肥料使用 ${has(DB.fertilizerUsage)} 条 ｜ 除草剂使用 ${has(DB.herbicideUsage)} 条</div>
+      <div class="kv" style="font-size:13px;color:var(--sub)">所有数据保存在本机应用目录，卸载软件前请先在「数据管理」导出备份。</div>
+    </div>`;
+}
+
 /* ================= 每日汇报（发微信） ================= */
 function buildReport(dateStr){
-  const works = DB.workRecords.filter(x=>x.date===dateStr);
-  const locSet = new Set(); works.forEach(x=>(x.locations||[]).forEach(l=>locSet.add(l)));
+  const works = dayLogs(dateStr);
+  const locSet = new Set(); works.forEach(x=>{ if(x.place) x.place.split(/[、,，]/).forEach(l=>l.trim()&&locSet.add(l.trim())); });
   const locs = [...locSet].join("、");
   const wx = DB.weathers.find(x=>x.date===dateStr);
   const weatherTxt = wx ? `${wx.morning}转${wx.afternoon}` : "";
@@ -571,11 +890,18 @@ function renderReport(){
         <button class="btn primary" onclick="downloadReportImg()">下载表格图片</button>
         <button class="btn" onclick="copyReport()">复制纯文本</button>
         <button class="btn" style="background:#07c160;color:#fff;border-color:#07c160" onclick="sendToWechat()">发送到微信</button>
+        <button class="btn" style="background:#2a6be7;color:#fff;border-color:#2a6be7" onclick="sendToWechatGroup()">发送到企业微信群</button>
       </div>
+      <div style="font-size:12px;color:var(--sub);margin-top:10px">📱 手机端发图片：点「下载表格图片」保存后，在微信聊天框点「＋」从相册选择这张图发送；长按下方图片也可以直接「存储图像」到相册。</div>
       <div style="font-size:12px;color:var(--sub);margin-top:10px">
-        第一次用：去 <b>sct.ftqq.com</b> 微信扫码登录，复制你的 SendKey，填到下面。
+        ① Server酱（发自己微信）：去 <b>sct.ftqq.com</b> 扫码登录，复制 SendKey 填下面并保存。
         <input type="text" id="sendKey" placeholder="粘贴 Server酱 SendKey（SCT...）" value="${(DB.settings&&DB.settings.sendkey)||''}" style="margin-top:6px;width:100%;padding:6px 10px;border:1px solid var(--line);border-radius:6px">
         <button class="btn" style="margin-top:6px" onclick="saveSendKey()">保存 SendKey</button>
+      </div>
+      <div style="font-size:12px;color:var(--sub);margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
+        ② 企业微信群（发到群里）：在目标企业微信群 → 群设置 → 群机器人 → 添加机器人，复制 Webhook 地址填下面并保存。
+        <input type="text" id="wxGroupUrl" placeholder="粘贴企业微信群机器人 Webhook（https://qyapi.weixin.qq.com/...）" value="${(DB.settings&&DB.settings.wxgroup)||''}" style="margin-top:6px;width:100%;padding:6px 10px;border:1px solid var(--line);border-radius:6px">
+        <button class="btn" style="margin-top:6px" onclick="saveWxGroup()">保存群机器人</button>
       </div>
     </div>
     <div class="card">
@@ -592,8 +918,8 @@ function drawReportImage(dateStr){
   const dpr = 2; // 高清
   const W = 750;
   // 先算内容
-  const works = DB.workRecords.filter(x=>x.date===dateStr);
-  const locSet = new Set(); works.forEach(x=>(x.locations||[]).forEach(l=>locSet.add(l)));
+  const works = dayLogs(dateStr);
+  const locSet = new Set(); works.forEach(x=>{ if(x.place) x.place.split(/[、,，]/).forEach(l=>l.trim()&&locSet.add(l.trim())); });
   const locs = [...locSet].join("、");
   const wx = DB.weathers.find(x=>x.date===dateStr);
   const d = new Date(dateStr+"T00:00:00");
@@ -683,6 +1009,28 @@ function saveSendKey(){
   DB.settings = DB.settings || {}; DB.settings.sendkey = k; save();
   toast(k?"SendKey 已保存":"已清空 SendKey");
 }
+function saveWxGroup(){
+  const k = document.getElementById("wxGroupUrl").value.trim();
+  DB.settings = DB.settings || {}; DB.settings.wxgroup = k; save();
+  toast(k?"群机器人已保存":"已清空群机器人");
+}
+async function sendToWechatGroup(){
+  const url = (DB.settings && DB.settings.wxgroup) || document.getElementById("wxGroupUrl").value.trim();
+  if(!url){ alert("请先填入企业微信群机器人 Webhook 并保存"); return; }
+  const dateStr = document.getElementById("repDate").value;
+  const txt = buildReport(dateStr);
+  try{
+    toast("正在发送到企业微信群…");
+    const r = await fetch(url, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({msgtype:"markdown", markdown:{content:"**工作日报 "+dateStr+"**\n" + txt.replace(/\n/g,"\n\n")}})
+    });
+    const j = await r.json();
+    if(j.errcode===0) toast("已发送到企业微信群");
+    else alert("发送失败："+(j.errmsg||JSON.stringify(j)));
+  }catch(e){ alert("发送失败（需要联网）："+e.message); }
+}
 async function sendToWechat(){
   const key = (DB.settings && DB.settings.sendkey) || document.getElementById("sendKey").value.trim();
   if(!key){ alert("请先填入 Server酱 SendKey 并保存"); return; }
@@ -735,8 +1083,7 @@ function renderSummary(scope){
 }
 function periodData(scope){
   const v = document.getElementById("sumPeriod").value;
-  const works = scope==="month" ? DB.workRecords.filter(x=>x.date.startsWith(v))
-                                : DB.workRecords.filter(x=>x.date.startsWith(v));
+  const works = (DB.workLogs||[]).filter(x=>x.date.startsWith(v) && (x.content||x.place||x.mileage));
   return {v, works,
     weathers: (scope==="month"?DB.weathers:DB.weathers).filter(x=>x.date.startsWith(v)),
     miles: DB.mileages.filter(x=>x.date.startsWith(v)),
@@ -744,7 +1091,6 @@ function periodData(scope){
 }
 function drawSummary(scope){
   const {v, works, weathers, miles, subs} = periodData(scope);
-  const doneN = works.filter(x=>x.done).length;
   const subTotal = subs.reduce((s,x)=>s+Number(x.amount||0),0);
   const days = new Set(works.map(x=>x.date)).size;
   // 周期行驶里程 = 本周期最后读数 - 上一周期最后读数
@@ -762,13 +1108,11 @@ function drawSummary(scope){
 
   // 工作内容汇总
   const workList = works.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>
-    `<tr><td>${x.date}</td><td>${(x.locations||[]).join("、")}</td><td>${esc(x.content)}</td>
-     <td>${x.done?'<span class="pill ok">完成</span>':'<span class="pill wait">进行中</span>'}</td></tr>`).join("");
+    `<tr><td>${x.date}</td><td>${esc(x.place||"")}</td><td>${esc(x.content)}</td></tr>`).join("");
 
   document.getElementById("sumContent").innerHTML = `
     <div class="stats">
       <div class="stat"><div class="label">工作记录</div><div class="num">${works.length}<small> 条</small></div><div class="hint">${days} 个工作日</div></div>
-      <div class="stat"><div class="label">完成率</div><div class="num">${works.length?Math.round(doneN/works.length*100):0}<small>%</small></div><div class="hint">${doneN} 条已完成</div></div>
       <div class="stat"><div class="label">行驶里程</div><div class="num">${km}<small> km</small></div><div class="hint">${miles.length} 次记录</div></div>
       <div class="stat"><div class="label">补贴合计</div><div class="num">¥${subTotal}</div><div class="hint">${subs.length} 条登记</div></div>
     </div>
@@ -776,9 +1120,9 @@ function drawSummary(scope){
     <div class="card">
       <h3>完成的工作明细<span class="meta">${works.length} 条</span></h3>
       <table>
-        <colgroup><col style="width:15%"><col style="width:25%"><col style="width:48%"><col style="width:12%"></colgroup>
-        <tr><th>日期</th><th>地点</th><th>工作内容</th><th>状态</th></tr>
-        ${workList || '<tr><td colspan="4" class="empty">这个周期还没有记录</td></tr>'}
+        <colgroup><col style="width:15%"><col style="width:25%"><col style="width:60%"></colgroup>
+        <tr><th>日期</th><th>地点</th><th>工作内容</th></tr>
+        ${workList || '<tr><td colspan="3" class="empty">这个周期还没有记录</td></tr>'}
       </table>
     </div>`;
 
@@ -820,7 +1164,6 @@ function drawSummary(scope){
 async function exportPPT(scope){
   if(typeof PptxGenJS === "undefined"){ alert("PPT 组件未加载，请确认 assets 文件夹完整"); return; }
   const {v, works, subs} = periodData(scope);
-  const doneN = works.filter(x=>x.done).length;
   const ppt = new PptxGenJS();
   ppt.defineLayout({name:"W",width:13.33,height:7.5}); ppt.layout="W";
   // 封面
@@ -833,11 +1176,10 @@ async function exportPPT(scope){
   s2.addText("数据概览", {x:0.5,y:0.4,w:12,h:0.8,fontSize:28,bold:true,color:"1F2937"});
   s2.addText([
     {text:`工作记录：${works.length} 条\n`,options:{fontSize:20,color:"2563eb",bold:true}},
-    {text:`完成：${doneN} 条（${works.length?Math.round(doneN/works.length*100):0}%）\n\n`,options:{fontSize:16}},
     {text:`补贴合计：¥${subs.reduce((a,b)=>a+Number(b.amount||0),0)}\n`,options:{fontSize:20,color:"16A34A",bold:true}},
   ], {x:0.8,y:1.5,w:11,h:2.5});
   // 工作明细（最多列 30 条）
-  const lines = works.slice(0,30).map(x=>`${x.date}  ${(x.locations||[]).join("、")}  ${x.content}`);
+  const lines = works.slice(0,30).map(x=>`${x.date}  ${x.place||""}  ${x.content}`);
   const s3 = ppt.addSlide();
   s3.addText("主要工作内容", {x:0.5,y:0.4,w:12,h:0.8,fontSize:28,bold:true,color:"1F2937"});
   s3.addText(lines.join("\n") || "（无记录）", {x:0.8,y:1.4,w:11.7,h:5.5,fontSize:14,color:"374151",breakLine:false});
@@ -893,9 +1235,10 @@ async function fetchWeather(){
 /* ================= 通用删除 & 路由 ================= */
 function delRec(coll, i){ if(confirm("删除这条记录？")){ DB[coll].splice(i,1); save(); route(); } }
 function route(){
+  applyTheme();
   renderNav();
   const h = location.hash || "#/home";
-  if(h==="#/work") renderWork();
+  if(h==="#/work"||h==="#/worklog") renderWork();   // 每日工作记录，内含工作日志子板块
   else if(h==="#/report") renderReport();
   else if(h==="#/weather") renderWeather();
   else if(h==="#/mileage") renderMileage();
@@ -904,8 +1247,1147 @@ function route(){
   else if(h==="#/summary-year") renderSummary("year");
   else if(h==="#/plan") renderPlan();
   else if(h==="#/backup") renderBackup();
+  else if(h==="#/wage") renderWage();
+  else if(h==="#/material") renderMaterial();
+  else if(h==="#/forest") renderForest();
+  else if(h==="#/burn") renderBurn();
+  else if(h==="#/inspect") renderInspect();
+  else if(h==="#/seedling") renderSeedling();
+  else if(h==="#/archive") renderArchive();
+  else if(h==="#/phrases") renderPhrases();
+  else if(h==="#/settings") renderSettings();
   else renderHome();
 }
+
+function fmtKip(n){ return Number(n||0).toLocaleString("zh-CN"); }
+function inp(w, ph, val){ return `<input style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px" ${w?`style="width:${w}px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px"`:""} placeholder="${ph||""}" ${val!==undefined?`value="${val}"`:""}>`; }
+
+/* ================= 临时工考勤发薪 ================= */
+let wageSel = null;
+let wageView = "month";   // month=按月份 | all=全部批次
+let wageMonthSel = null;  // 当前展开的月份 key，如 2026-3
+function toggleWage(id){ wageSel = (wageSel===id)?null:id; renderWage(); }
+function toggleWageMonth(k){ wageMonthSel = (wageMonthSel===k)?null:k; renderWage(); }
+function renderWage(){ if(wageView==="month") renderWageMonth(); else renderWageAll(); }
+/* 解析批次名中的月份：返回 {y,m} 或 null */
+function batchMonth(b){
+  const s = b.name || "";
+  let m = s.match(/(20\d{2})\s*年\s*(\d{1,2})\s*月/);
+  if(m) return {y:+m[1], m:+m[2]};
+  m = s.match(/(\d{1,2})\.(\d{1,2})/);
+  if(m && +m[1]>=1 && +m[1]<=12) return {y:2026, m:+m[1]};
+  return null;
+}
+/* 批次名统一显示为完整月日：2.24-25 → 2月24日-2月25日；8.11-8.20 → 8月11日-8月20日 */
+function fmtWageName(b){
+  const n = b.name || "";
+  const m = n.match(/^(\d{1,2})\.(\d{1,2})-(\d{1,2})(?:\.(\d{1,2}))?\.?$/);
+  if(!m) return n;
+  const m1=+m[1], d1=+m[2];
+  let m2, d2;
+  if(m[4]){ m2=+m[3]; d2=+m[4]; } else { m2=m1; d2=+m[3]; }
+  return m1+"月"+d1+"日-"+m2+"月"+d2+"日";
+}
+function renderWageAll(){
+  const batches = DB.wageBatches;  // 保持录入顺序，顺序可用上下移按钮调整
+  let totD=0, totA=0; batches.forEach(b=>{ totD+=Number(b.totalDays||0); totA+=Number(b.totalAmt||0); });
+  view.innerHTML = `
+    <div class="topbar"><h1>临时工考勤发薪</h1>
+      <div class="btns">
+        <button class="btn ${wageView==="month"?"primary":""}" onclick="wageView='month';renderWage()">按月份</button>
+        <button class="btn ${wageView==="all"?"primary":""}" onclick="wageView='all';renderWage()">全部批次</button>
+        <button class="btn primary" onclick="addWageBatch()">新增批次</button>
+        <button class="btn" onclick="exportWageExcel()">导出考勤 Excel</button>
+      </div></div>
+    <div class="stats">
+      <div class="stat"><div class="label">考勤批次</div><div class="num">${batches.length}<small> 批</small></div><div class="hint">含预置历史批次</div></div>
+      <div class="stat"><div class="label">累计工日/件</div><div class="num">${fmtKip(totD)}</div><div class="hint">日工+计件合计</div></div>
+      <div class="stat"><div class="label">累计发放金额</div><div class="num">${fmtKip(totA)}</div><div class="hint">基普</div></div>
+    </div>
+    ${batches.map((b,bi)=>{
+      const open = wageSel===b.id;
+      return `<div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer" onclick="toggleWage('${esc(b.id)}')">
+          <div><b>${esc(fmtWageName(b))}</b> <span class="meta">${b.kind==="计件"?"计件工":"日工"}${b.range?" · "+esc(b.range):""}</span></div>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+            <span class="amt" style="color:var(--green);font-weight:600">${fmtKip(b.totalAmt)}</span>
+            <span class="meta">${b.records.length} 人 · ${b.kind==="计件"?b.totalDays+" 件":b.totalDays+" 天"}</span>
+            <span style="font-size:12px;color:var(--sub)">${open?"▲":"▼"}</span>
+            <span style="display:inline-flex;gap:6px" onclick="event.stopPropagation()">
+              <button class="btn" onclick="moveWageBatch('${esc(b.id)}',-1)" title="上移">上移</button>
+              <button class="btn" onclick="moveWageBatch('${esc(b.id)}',1)" title="下移">下移</button>
+              <button class="btn" onclick="editWageBatch('${esc(b.id)}')">编辑</button>
+              <button class="btn danger" onclick="delWageBatch('${esc(b.id)}')">删</button>
+            </span>
+          </div>
+        </div>
+        ${open?`
+        <div style="margin-top:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+            <input id="wgLao" placeholder="老语姓名" style="width:130px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+            <input id="wgZh" placeholder="中文姓名" style="width:110px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+            <input id="wgV" placeholder="村" style="width:100px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+            <input id="wgD" type="number" step="0.5" placeholder="${b.kind==="计件"?"件数":"天数"}" style="width:90px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+            <button class="btn primary" onclick="addWageRec('${esc(b.id)}')">添加</button>
+          </div>
+          <table>
+            <colgroup><col style="width:20%"><col style="width:16%"><col style="width:14%"><col style="width:11%"><col style="width:21%"><col style="width:18%"></colgroup>
+            <tr><th>老语</th><th>中文</th><th>村</th><th>${b.kind==="计件"?"件数":"天数"}</th><th>金额(基普)</th><th>操作</th></tr>
+            ${b.records.map((r,i)=>`<tr><td>${esc(r.lao)}</td><td>${esc(r.name)}</td><td>${esc(r.village)}</td><td>${r.days}</td><td>${fmtKip(r.amount)}</td>
+              <td><button class="btn" onclick="editWageRec('${esc(b.id)}',${i})">改</button> <button class="btn danger" onclick="delWageRec('${esc(b.id)}',${i})">删</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">暂无人员</td></tr>'}
+            <tr style="font-weight:600"><td colspan="3">合计</td><td>${b.totalDays}</td><td>${fmtKip(b.totalAmt)}</td><td></td></tr>
+          </table>
+        </div>`:""}
+      </div>`;
+    }).join("") || '<div class="card">还没有考勤批次，点右上角「新增批次」</div>'}`;
+}
+function renderWageMonth(){
+  const batches = DB.wageBatches;
+  const groups = {};
+  const unk = [];
+  batches.forEach(b=>{
+    const mm = batchMonth(b);
+    if(mm){ const k = mm.y+"-"+mm.m; (groups[k]=groups[k]||{y:mm.y,m:mm.m,list:[]}).list.push(b); }
+    else unk.push(b);
+  });
+  const keys = Object.keys(groups).sort((a,b)=>a<b?-1:1);
+  let totD=0, totA=0; batches.forEach(b=>{ totD+=Number(b.totalDays||0); totA+=Number(b.totalAmt||0); });
+  view.innerHTML = `
+    <div class="topbar"><h1>临时工考勤发薪</h1>
+      <div class="btns">
+        <button class="btn ${wageView==="month"?"primary":""}" onclick="wageView='month';renderWage()">按月份</button>
+        <button class="btn ${wageView==="all"?"primary":""}" onclick="wageView='all';renderWage()">全部批次</button>
+        <button class="btn primary" onclick="addWageBatch()">新增批次</button>
+        <button class="btn" onclick="exportWageExcel()">导出考勤 Excel</button>
+      </div></div>
+    <div class="stats">
+      <div class="stat"><div class="label">覆盖月份</div><div class="num">${keys.length}<small> 个月</small></div><div class="hint">2026年2月至今</div></div>
+      <div class="stat"><div class="label">考勤批次</div><div class="num">${batches.length}<small> 批</small></div></div>
+      <div class="stat"><div class="label">累计工日/件</div><div class="num">${fmtKip(totD)}</div></div>
+      <div class="stat"><div class="label">累计发放金额</div><div class="num">${fmtKip(totA)}</div><div class="hint">基普</div></div>
+    </div>
+    ${keys.map(k=>{
+      const g = groups[k];
+      const gD = g.list.reduce((a,b)=>a+Number(b.totalDays||0),0);
+      const gA = g.list.reduce((a,b)=>a+Number(b.totalAmt||0),0);
+      const open = wageMonthSel===k;
+      return `<div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer" onclick="toggleWageMonth('${k}')">
+          <div><b>${g.y}年${g.m}月</b> <span class="meta">${g.list.length} 批</span></div>
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <span class="meta">${fmtKip(gD)} 工日/件</span>
+            <span class="amt" style="color:var(--green);font-weight:600">${fmtKip(gA)}</span>
+            <span style="font-size:12px;color:var(--sub)">${open?"▲":"▼"}</span>
+          </div>
+        </div>
+        ${open? g.list.map((b)=>{
+          const bOpen = wageSel===b.id;
+          return `<div style="margin:10px 0 0 14px;padding:10px;border:1px solid var(--line);border-radius:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer" onclick="toggleWage('${esc(b.id)}')">
+              <div><b>${esc(fmtWageName(b))}</b> <span class="meta">${b.kind==="计件"?"计件工":"日工"}</span></div>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <span class="amt" style="color:var(--green);font-weight:600">${fmtKip(b.totalAmt)}</span>
+                <span class="meta">${b.records.length} 人 · ${b.kind==="计件"?b.totalDays+" 件":b.totalDays+" 天"}</span>
+                <span style="font-size:12px;color:var(--sub)">${bOpen?"▲":"▼"}</span>
+                <span style="display:inline-flex;gap:6px" onclick="event.stopPropagation()">
+                  <button class="btn" onclick="moveWageBatch('${esc(b.id)}',-1)" title="上移">上移</button>
+                  <button class="btn" onclick="moveWageBatch('${esc(b.id)}',1)" title="下移">下移</button>
+                  <button class="btn" onclick="editWageBatch('${esc(b.id)}')">编辑</button>
+                  <button class="btn danger" onclick="delWageBatch('${esc(b.id)}')">删</button>
+                </span>
+              </div>
+            </div>
+            ${bOpen?`
+            <div style="margin-top:10px">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+                <input id="wgLao" placeholder="老语姓名" style="width:120px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+                <input id="wgZh" placeholder="中文姓名" style="width:100px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+                <input id="wgV" placeholder="村" style="width:90px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+                <input id="wgD" type="number" step="0.5" placeholder="${b.kind==="计件"?"件数":"天数"}" style="width:80px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+                <button class="btn primary" onclick="addWageRec('${esc(b.id)}')">添加</button>
+              </div>
+              <table>
+                <colgroup><col style="width:20%"><col style="width:16%"><col style="width:14%"><col style="width:11%"><col style="width:21%"><col style="width:18%"></colgroup>
+                <tr><th>老语</th><th>中文</th><th>村</th><th>${b.kind==="计件"?"件数":"天数"}</th><th>金额(基普)</th><th>操作</th></tr>
+                ${b.records.map((r,i)=>`<tr><td>${esc(r.lao)}</td><td>${esc(r.name)}</td><td>${esc(r.village)}</td><td>${r.days}</td><td>${fmtKip(r.amount)}</td>
+                  <td><button class="btn" onclick="editWageRec('${esc(b.id)}',${i})">改</button> <button class="btn danger" onclick="delWageRec('${esc(b.id)}',${i})">删</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">暂无人员</td></tr>'}
+                <tr style="font-weight:600"><td colspan="3">合计</td><td>${b.totalDays}</td><td>${fmtKip(b.totalAmt)}</td><td></td></tr>
+              </table>
+            </div>`:""}
+          </div>`;
+        }).join("") : '<div style="margin:10px 0 0 14px;color:var(--sub);font-size:13px">点击展开查看该月批次</div>'}
+      </div>`;
+    }).join("") || ""}
+    ${unk.length?`
+    <div class="card">
+      <div><b>未识别日期</b> <span class="meta">${unk.length} 批 · 名称里没写日期，点「编辑」补上如 10.1-10.10 即可归入月份</span></div>
+      ${unk.map(b=>`<div style="margin:8px 0 0;padding:6px 0;border-top:1px dashed var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center">
+        <span>${esc(fmtWageName(b))}</span>
+        <span style="display:inline-flex;gap:6px">
+          <button class="btn" onclick="moveWageBatch('${esc(b.id)}',-1)">上移</button>
+          <button class="btn" onclick="moveWageBatch('${esc(b.id)}',1)">下移</button>
+          <button class="btn" onclick="editWageBatch('${esc(b.id)}')">编辑</button>
+          <button class="btn danger" onclick="delWageBatch('${esc(b.id)}')">删</button>
+        </span>
+      </div>`).join("")}
+    </div>`:""}`;
+}
+function addWageBatch(){
+  const name = prompt("批次名称（如：2026年10月 孟农苗圃 日工 10.1-10.10）");
+  if(!name) return;
+  const kind = confirm("点确定=日工（按天计），点取消=计件工（按件计）") ? "日工" : "计件";
+  const rate = prompt(kind==="日工" ? "日工资（基普/天，默认150000）" : "计件单价（基普/件，默认3500）");
+  DB.wageBatches.push({id:"wage_"+Date.now(), name, range:"", kind, rate: rate?Number(rate):(kind==="日工"?150000:3500), totalDays:0, totalAmt:0, records:[]});
+  save(); renderWage();
+}
+function delWageBatch(id){ if(confirm("删除整个批次？")){ DB.wageBatches = DB.wageBatches.filter(b=>b.id!==id); save(); renderWage(); } }
+function moveWageBatch(id, dir){
+  const i = DB.wageBatches.findIndex(x=>x.id===id);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=DB.wageBatches.length) return;
+  const t = DB.wageBatches[i]; DB.wageBatches[i]=DB.wageBatches[j]; DB.wageBatches[j]=t;
+  save(); renderWage();
+}
+function editWageBatch(id){
+  const b = DB.wageBatches.find(x=>x.id===id); if(!b) return;
+  const name = prompt("批次名称（建议含日期范围，如：3.3-3.11 日工）", b.name);
+  if(name===null) return;
+  const kind = confirm(`当前类型：${b.kind==="计件"?"计件工":"日工"}。点「确定」保持${b.kind==="计件"?"计件工":"日工"}，点「取消」切换为${b.kind==="计件"?"日工":"计件工"}`);
+  const rate = prompt("日工资/计件单价（基普），改完后天数/件数不变，金额不变", b.rate);
+  b.name = (name||"").trim() || b.name;
+  b.kind = kind ? "日工" : "计件";
+  if(rate && !isNaN(Number(rate))) b.rate = Number(rate);
+  save(); renderWage();
+}
+function editWageRec(batchId, i){
+  const b = DB.wageBatches.find(x=>x.id===batchId); if(!b) return;
+  const r = b.records[i]; if(!r) return;
+  const lao = prompt("老语姓名", r.lao||""); if(lao===null) return;
+  const zh = prompt("中文姓名", r.name||""); if(zh===null) return;
+  const v = prompt("村", r.village||""); if(v===null) return;
+  const d = prompt(b.kind==="计件"?"件数（改完按单价自动重算金额）":"天数（改完按单价自动重算金额）", r.days); if(d===null) return;
+  const dd = parseFloat(d); if(isNaN(dd)||dd<=0){ alert("天数/件数无效"); return; }
+  const rate = b.rate || (b.kind==="计件"?3500:150000);
+  const newAmt = Math.round(dd*rate);
+  b.totalDays = Math.round((b.totalDays - r.days + dd)*10)/10;
+  b.totalAmt = b.totalAmt - r.amount + newAmt;
+  r.lao = (lao||"").trim(); r.name = (zh||"").trim(); r.village = (v||"").trim(); r.days = dd; r.amount = newAmt;
+  save(); renderWage();
+}
+function addWageRec(id){
+  const b = DB.wageBatches.find(x=>x.id===id); if(!b) return;
+  const lao = document.getElementById("wgLao").value.trim();
+  const zh = document.getElementById("wgZh").value.trim();
+  const v = document.getElementById("wgV").value.trim();
+  const d = parseFloat(document.getElementById("wgD").value);
+  if(!zh || isNaN(d) || d<=0){ alert("请填中文姓名和天数/件数"); return; }
+  const rate = b.rate || (b.kind==="计件"?3500:150000);
+  const amt = Math.round(d * rate);
+  b.records.push({lao, name:zh, village:v, days:d, amount:amt});
+  b.totalDays = Math.round((b.totalDays + d)*10)/10;
+  b.totalAmt = b.totalAmt + amt;
+  save(); renderWage();
+}
+function delWageRec(id, i){
+  const b = DB.wageBatches.find(x=>x.id===id); if(!b) return;
+  if(!confirm("删除这条考勤？")) return;
+  const r = b.records[i]; b.records.splice(i,1);
+  b.totalDays = Math.round((b.totalDays - r.days)*10)/10;
+  b.totalAmt = b.totalAmt - r.amount;
+  save(); renderWage();
+}
+function exportWageExcel(){
+  if(typeof XLSX === "undefined"){ alert("Excel 组件未加载"); return; }
+  const wb = XLSX.utils.book_new();
+  DB.wageBatches.forEach(b=>{
+    const aoa = [[`太阳纸业控股老挝有限责任公司考勤表  ${b.name}`], ["老语","中文","村",b.kind==="计件"?"件数":"天数","金额(基普)"]];
+    b.records.forEach(r=>aoa.push([r.lao||"", r.name||"", r.village||"", r.days, r.amount]));
+    aoa.push(["合计","","",b.totalDays,b.totalAmt]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), (b.name||"批次").slice(0,28));
+  });
+  const sum = [["批次","类型","范围","总天数/件数","总金额(基普)"], ...DB.wageBatches.map(b=>[b.name,b.kind,b.range||"",b.totalDays,b.totalAmt])];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), "批次汇总");
+  XLSX.writeFile(wb, "考勤发薪汇总.xlsx");
+  toast("考勤 Excel 已导出");
+}
+
+/* ================= 物资台账（肥料/除草剂） ================= */
+let matTab = "overview";
+let matF = {region:"", forest:"", kw:""};   // 筛选状态：林区/林场/关键字
+let matEdit = null;   // {coll, i} 正在编辑的记录
+let matNew = null;    // 正在新增的表类型
+
+/* ===== 字段定义（新增/编辑表单用）===== */
+const MAT_FIELDS = {
+  fertilizerUsage:   [{k:"region",l:"林区"},{k:"forest",l:"林场"},{k:"block",l:"林班"},{k:"code",l:"林班代码"},{k:"area",l:"面积"},{k:"material",l:"肥料"},{k:"spec",l:"规格"},{k:"usage",l:"使用量(吨)"},{k:"place",l:"地点"}],
+  fertilizerIssue: [{k:"region",l:"林区"},{k:"forest",l:"林场"},{k:"village",l:"村"},{k:"farmer",l:"种植户"},{k:"code",l:"林班代码"},{k:"area",l:"清山面积"},{k:"material",l:"肥料"},{k:"spec",l:"规格"},{k:"bags",l:"袋数"}],
+  fertilizerStock: [{k:"region",l:"林区"},{k:"forest",l:"林场"},{k:"place",l:"地点"},{k:"material",l:"肥料"},{k:"spec",l:"规格"},{k:"stock",l:"库存(袋)"}],
+  herbicideStock: [{k:"region",l:"林区"},{k:"forest",l:"林场"},{k:"place",l:"地点"},{k:"material",l:"除草剂"},{k:"spec",l:"规格"},{k:"stock",l:"库存(箱)"}],
+  herbicideUsage:   [{k:"region",l:"林区"},{k:"forest",l:"林场"},{k:"block",l:"林班"},{k:"code",l:"代码"},{k:"area",l:"面积"},{k:"contractor",l:"包商"},{k:"material",l:"除草剂"},{k:"usage",l:"使用量(箱)"},{k:"spec",l:"规格"}],
+  seedlingUsage:  [{k:"region",l:"林区"},{k:"forest",l:"林场"},{k:"block",l:"林班"},{k:"code",l:"代码"},{k:"area",l:"面积(亩)"},{k:"qty",l:"株数"}]
+};
+const MAT_NUM = { fertilizerUsage:["area","usage"], fertilizerIssue:["area","bags"], fertilizerStock:["stock"], herbicideStock:["stock"], herbicideUsage:["area","usage"], seedlingUsage:["area","qty"] };
+
+/* ===== 物资台账：筛选条件匹配 ===== */
+function matFMatch(r){
+  if(matF.region && r.region!==matF.region) return false;
+  if(matF.forest && r.forest!==matF.forest) return false;
+  if(matF.kw){
+    const kw = matF.kw.toLowerCase();
+    const hay = [r.region, r.forest, r.block, r.code, r.village, r.farmer, r.material, r.spec, r.place, r.contractor].join(" ").toLowerCase();
+    if(!hay.includes(kw)) return false;
+  }
+  return true;
+}
+function matFilterBar(){
+  const all = [].concat(DB.fertilizerUsage, DB.fertilizerIssue, DB.fertilizerStock, DB.herbicideStock, DB.herbicideUsage, DB.seedlingUsage);
+  const regions = [...new Set(all.map(r=>r.region).filter(Boolean))].sort();
+  const forests = [...new Set(all.map(r=>r.forest).filter(Boolean))].sort();
+  return `<div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <span style="font-size:13px;color:var(--sub)">筛选：</span>
+    <select onchange="matF.region=this.value;renderMaterial()" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+      <option value="">全部林区</option>${regions.map(r=>`<option ${matF.region===r?"selected":""}>${esc(r)}</option>`).join("")}</select>
+    <select onchange="matF.forest=this.value;renderMaterial()" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+      <option value="">全部林场</option>${forests.map(f=>`<option ${matF.forest===f?"selected":""}>${esc(f)}</option>`).join("")}</select>
+    <input id="matKw" placeholder="搜索林班/代码/种植户/物料…" value="${esc(matF.kw)}" onkeydown="if(event.key==='Enter'){matF.kw=this.value.trim();renderMaterial()}" style="flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+    <button class="btn" onclick="matF.kw=document.getElementById('matKw').value.trim();renderMaterial()">搜索</button>
+    <button class="btn" onclick="matF={region:'',forest:'',kw:''};renderMaterial()">清除</button>
+  </div>`;
+}
+function renderMaterial(){
+  const tabs = [["overview","总览"],["fertilizerUsage","肥料使用"],["fertilizerIssue","合作林发放"],["fertilizerStock","肥料库存"],["herbicideStock","除草剂库存"],["herbicideUsage","除草剂使用"],["seedlingUsage","苗木使用"]];
+  view.innerHTML = `
+    <div class="topbar"><h1>物资台账</h1>
+      <div class="btns">
+        ${tabs.map(t=>`<button class="btn ${matTab===t[0]?"primary":""}" onclick="matTab='${t[0]}';renderMaterial()">${t[1]}</button>`).join("")}
+        <button class="btn primary" onclick="document.getElementById('matFile').click()">导入 Excel</button>
+        <input type="file" id="matFile" accept=".xlsx,.xls" style="display:none" onchange="importMaterialExcel(this)">
+      </div></div>
+    ${matFilterBar()}`;
+  if(matTab==="overview") matOverview();
+  else if(matTab==="fertilizerUsage") matFertUse();
+  else if(matTab==="fertilizerIssue") matFertIssue();
+  else if(matTab==="fertilizerStock") matStock(DB.fertilizerStock, "fertilizerStock");
+  else if(matTab==="herbicideStock") matStock(DB.herbicideStock, "herbicideStock");
+  else if(matTab==="seedlingUsage") matSeedling();
+  else matHerbUse();
+}
+function matTable(headers, rows, empty){
+  return `<div class="card" style="overflow:auto"><table style="min-width:760px">
+    <colgroup>${headers.map(h=>`<col>`).join("")}</colgroup>
+    <tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr>
+    ${rows.join("") || `<tr><td colspan="${headers.length}" class="empty">${empty||"暂无记录"}</td></tr>`}
+  </table></div>`;
+}
+/* ===== 新增 / 编辑 / 删除 通用 ===== */
+function matAddBtn(coll){
+  return `<div class="card" style="padding:8px 14px;margin-bottom:12px">
+    <button class="btn primary" onclick="matNew='${coll}';renderMaterial()">+ 新增记录</button>
+    <span style="font-size:12px;color:var(--sub);margin-left:8px">库存出库/入库、记录有误，都可以在这里新增、修改或删除</span></div>`;
+}
+function matAddForm(coll){
+  if(matNew !== coll) return "";
+  const fields = MAT_FIELDS[coll];
+  return `<div class="card" style="margin-bottom:12px;padding:14px"><form onsubmit="matAddSave(event,'${coll}')" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+    ${fields.map(f=>`<div class="field" style="margin:0"><label>${f.l}</label><input name="${f.k}" ${MAT_NUM[coll].includes(f.k)?'type="number" step="0.01"':''}></div>`).join("")}
+    <button class="btn primary" type="submit">保存</button>
+    <button type="button" class="btn" onclick="matNew=null;renderMaterial()">取消</button></form></div>`;
+}
+function matAddSave(e, coll){
+  e.preventDefault(); const f = e.target; const rec = {};
+  MAT_FIELDS[coll].forEach(fd=>{
+    let v = (f[fd.k]?f[fd.k].value:"").trim();
+    if(MAT_NUM[coll].includes(fd.k)){ v = parseFloat(v); if(isNaN(v)) v = 0; }
+    rec[fd.k] = v;
+  });
+  DB[coll].push(rec); matNew = null; save(); renderMaterial();
+}
+function matEditRow(coll, i, colCount){
+  if(!(matEdit && matEdit.coll===coll && matEdit.i===i)) return "";
+  const r = DB[coll][i]; const fields = MAT_FIELDS[coll];
+  return `<tr><td colspan="${colCount}" style="background:var(--bg)"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+    ${fields.map(f=>`<div class="field" style="margin:0"><label>${f.l}</label><input id="me_${f.k}" ${MAT_NUM[coll].includes(f.k)?'type="number" step="0.01"':''} value="${esc(String(r[f.k]??""))}"></div>`).join("")}
+    <button class="btn primary" onclick="matEditSave('${coll}',${i})">保存</button>
+    <button class="btn" onclick="matEdit=null;renderMaterial()">取消</button></div></td></tr>`;
+}
+function matEditSave(coll, i){
+  const fields = MAT_FIELDS[coll];
+  fields.forEach(f=>{
+    const el = document.getElementById("me_"+f.k);
+    if(el){ let v = el.value.trim(); if(MAT_NUM[coll].includes(f.k)){ v = parseFloat(v); if(isNaN(v)) v = 0; } DB[coll][i][f.k] = v; }
+  });
+  matEdit = null; save(); renderMaterial();
+}
+function matOps(coll, i){
+  return `<button class="btn" onclick="matEdit={coll:'${coll}',i:${i}};renderMaterial()">改</button>
+    <button class="btn danger" onclick="delMatRec('${coll}',${i})">删</button>`;
+}
+function delMatRec(coll, i){ if(confirm("删除这条记录？")){ DB[coll].splice(i,1); save(); renderMaterial(); } }
+/* ===== 总览：库存种类+存放点 / 地块施肥量 / 苗木汇总 ===== */
+function matOverview(){
+  const fs = DB.fertilizerStock, hs = DB.herbicideStock;
+  const stockMap = {};
+  fs.forEach(r=>{ const k="肥料|"+r.material+"|"+(r.spec||"-"); (stockMap[k]=stockMap[k]||{kind:"肥料",material:r.material,spec:r.spec||"-",total:0,spots:[]}).total+=Number(r.stock||0); (stockMap[k].spots).push((r.place||"")+" "+(r.stock||0)+"袋"); });
+  hs.forEach(r=>{ const k="除草剂|"+r.material+"|"+(r.spec||"-"); (stockMap[k]=stockMap[k]||{kind:"除草剂",material:r.material,spec:r.spec||"-",total:0,spots:[]}).total+=Number(r.stock||0); (stockMap[k].spots).push((r.place||"")+" "+(r.stock||0)+"箱"); });
+  const fert = DB.fertilizerUsage.filter(matFMatch);
+  const plotMap = {};
+  fert.forEach(r=>{ const k=r.region+"|"+r.forest+"|"+r.block; plotMap[k]=plotMap[k]||{region:r.region,forest:r.forest,block:r.block,ton:0}; plotMap[k].ton+=Number(r.usage||0); });
+  const plots = Object.values(plotMap).sort((a,b)=>b.ton-a.ton);
+  const sd = DB.seedlingUsage.filter(matFMatch);
+  const sdQty = sd.reduce((a,r)=>a+Number(r.qty||0),0);
+  const sdArea = sd.reduce((a,r)=>a+Number(r.area||0),0);
+  view.innerHTML += `
+    <div class="stats">
+      <div class="stat"><div class="label">库存种类</div><div class="num">${Object.keys(stockMap).length}<small> 种</small></div><div class="hint">肥料+除草剂</div></div>
+      <div class="stat"><div class="label">施肥地块</div><div class="num">${plots.length}<small> 块</small></div><div class="hint">筛选范围内</div></div>
+      <div class="stat"><div class="label">苗木使用地块</div><div class="num">${sd.length}<small> 块</small></div><div class="hint">${sdQty.toLocaleString()} 株</div></div>
+      <div class="stat"><div class="label">苗木总面积</div><div class="num">${fmtKip(sdArea.toFixed(1))}<small> 亩</small></div></div>
+    </div>
+    <div class="card" style="margin-bottom:12px"><b>库存总览（按种类 + 存放点）</b>
+      <table><tr><th>类别</th><th>物料</th><th>规格</th><th>总库存</th><th>存放点分布</th></tr>
+      ${Object.entries(stockMap).map(([k,v])=>`<tr><td>${v.kind}</td><td>${esc(v.material)}</td><td>${esc(v.spec)}</td><td><b>${fmtKip(v.total)} ${v.kind==="除草剂"?"箱":"袋"}</b></td><td style="font-size:12px">${esc(v.spots.join("；"))}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">暂无库存数据</td></tr>'}
+      </table></div>
+    <div class="card" style="margin-bottom:12px"><b>地块施肥量（按林区·林场·林班合计，吨）</b>
+      <table><tr><th>林区</th><th>林场</th><th>林班</th><th>施肥量(吨)</th></tr>
+      ${plots.map(p=>`<tr><td>${esc(p.region)}</td><td>${esc(p.forest)}</td><td>${esc(p.block)}</td><td>${p.ton.toFixed(1)}</td></tr>`).join("") || '<tr><td colspan="4" class="empty">暂无施肥数据</td></tr>'}
+      </table></div>
+    <div class="card"><b>苗木使用汇总（株数）</b>
+      <table><tr><th>林区</th><th>林场</th><th>林班</th><th>面积(亩)</th><th>株数</th></tr>
+      ${sd.map(r=>`<tr><td>${esc(r.region)}</td><td>${esc(r.forest)}</td><td>${esc(r.block)}</td><td>${r.area}</td><td>${r.qty.toLocaleString()}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">暂无苗木数据</td></tr>'}
+      </table></div>`;
+}
+function matFertUse(){
+  const list = DB.fertilizerUsage.filter(matFMatch);
+  const sumBy = {};
+  list.forEach(r=>{ const k=r.forest+"|"+r.material+"|"+(r.spec||"-"); sumBy[k]=(sumBy[k]||0)+Number(r.usage||0); });
+  view.innerHTML += `
+    <div class="stats">
+      <div class="stat"><div class="label">自营林记录</div><div class="num">${list.length}<small> 条</small></div></div>
+      <div class="stat"><div class="label">肥料种类</div><div class="num">${Object.keys(sumBy).length}<small> 种</small></div></div>
+      <div class="stat"><div class="label">按林班合计使用</div><div class="num">${fmtKip(Object.values(sumBy).reduce((a,b)=>a+b,0).toFixed(1))}<small> 吨</small></div></div>
+    </div>
+    ${matAddBtn("fertilizerUsage")}${matAddForm("fertilizerUsage")}
+    <div class="card" style="margin-bottom:12px"><b>按 林场·肥料 汇总（吨）</b>
+      <table><tr><th>林场</th><th>物料</th><th>规格</th><th>使用量(吨)</th></tr>
+      ${Object.entries(sumBy).map(([k,v])=>{ const p=k.split("|"); return `<tr><td>${esc(p[0])}</td><td>${esc(p[1])}</td><td>${esc(p[2])}</td><td>${v}</td></tr>`;}).join("")}
+      </table></div>`;
+  view.innerHTML += matTable(["林区","林场","林班","林班代码","面积","物料","规格","使用量(吨)","地点","操作"],
+    list.flatMap((r,i)=>[
+      matEditRow("fertilizerUsage", i, 10),
+      `<tr><td>${esc(r.region)}</td><td>${esc(r.forest)}</td><td>${esc(r.block)}</td><td>${esc(r.code)}</td><td>${r.area}</td><td>${esc(r.material)}</td><td>${esc(r.spec)}</td><td>${r.usage}</td><td>${esc(r.place)}</td><td>${matOps("fertilizerUsage", i)}</td></tr>`
+    ]));
+}
+function matFertIssue(){
+  const list = DB.fertilizerIssue.filter(matFMatch);
+  const sumBags = list.reduce((a,r)=>a+Number(r.bags||0),0);
+  view.innerHTML += `
+    <div class="stats">
+      <div class="stat"><div class="label">合作林发放</div><div class="num">${list.length}<small> 条</small></div></div>
+      <div class="stat"><div class="label">合计发放</div><div class="num">${sumBags}<small> 袋</small></div></div>
+    </div>
+    ${matAddBtn("fertilizerIssue")}${matAddForm("fertilizerIssue")}`;
+  view.innerHTML += matTable(["林区","林场","村","种植户","林班代码","清山面积","肥料","规格","袋数","操作"],
+    list.flatMap((r,i)=>[
+      matEditRow("fertilizerIssue", i, 10),
+      `<tr><td>${esc(r.region)}</td><td>${esc(r.forest)}</td><td>${esc(r.village)}</td><td>${esc(r.farmer)}</td><td>${esc(r.code)}</td><td>${r.area}</td><td>${esc(r.material)}</td><td>${esc(r.spec)}</td><td>${r.bags}</td><td>${matOps("fertilizerIssue", i)}</td></tr>`
+    ]));
+}
+function matStock(arr, key){
+  const list = arr.filter(matFMatch);
+  const tot = list.reduce((a,r)=>a+Number(r.stock||0),0);
+  view.innerHTML += `<div class="stats"><div class="stat"><div class="label">记录</div><div class="num">${list.length}<small> 条</small></div></div>
+    <div class="stat"><div class="label">总库存</div><div class="num">${fmtKip(tot)}<small> ${key==="herbicideStock"?"箱":"袋"}</small></div></div></div>
+    ${matAddBtn(key)}${matAddForm(key)}`;
+  view.innerHTML += matTable(["林区","林场","地点","物料","规格","库存","操作"],
+    list.flatMap((r,i)=>[
+      matEditRow(key, i, 7),
+      `<tr><td>${esc(r.region)}</td><td>${esc(r.forest)}</td><td>${esc(r.place)}</td><td>${esc(r.material)}</td><td>${esc(r.spec)}</td><td>${r.stock} ${key==="herbicideStock"?"箱":"袋"}</td><td>${matOps(key, i)}</td></tr>`
+    ]));
+}
+function matHerbUse(){
+  const list = DB.herbicideUsage.filter(matFMatch);
+  view.innerHTML += `<div class="stats"><div class="stat"><div class="label">除草剂使用</div><div class="num">${list.length}<small> 条</small></div></div></div>
+    ${matAddBtn("herbicideUsage")}${matAddForm("herbicideUsage")}`;
+  view.innerHTML += matTable(["林区","林场","林班","代码","面积","包商","除草剂","使用量(箱)","规格","操作"],
+    list.flatMap((r,i)=>[
+      matEditRow("herbicideUsage", i, 10),
+      `<tr><td>${esc(r.region)}</td><td>${esc(r.forest)}</td><td>${esc(r.block)}</td><td>${esc(r.code)}</td><td>${r.area}</td><td>${esc(r.contractor)}</td><td>${esc(r.material)}</td><td>${r.usage}</td><td>${esc(r.spec)}</td><td>${matOps("herbicideUsage", i)}</td></tr>`
+    ]));
+}
+/* ===== 苗木使用 ===== */
+function matSeedling(){
+  const list = DB.seedlingUsage.filter(matFMatch);
+  const qty = list.reduce((a,r)=>a+Number(r.qty||0),0);
+  const area = list.reduce((a,r)=>a+Number(r.area||0),0);
+  view.innerHTML += `
+    <div class="stats">
+      <div class="stat"><div class="label">苗木使用地块</div><div class="num">${list.length}<small> 块</small></div></div>
+      <div class="stat"><div class="label">合计面积</div><div class="num">${fmtKip(area.toFixed(1))}<small> 亩</small></div></div>
+      <div class="stat"><div class="label">合计株数</div><div class="num">${qty.toLocaleString()}<small> 株</small></div></div>
+    </div>
+    ${matAddBtn("seedlingUsage")}${matAddForm("seedlingUsage")}`;
+  view.innerHTML += matTable(["林区","林场","林班","代码","面积(亩)","株数","操作"],
+    list.flatMap((r,i)=>[
+      matEditRow("seedlingUsage", i, 7),
+      `<tr><td>${esc(r.region)}</td><td>${esc(r.forest)}</td><td>${esc(r.block)}</td><td>${esc(r.code)}</td><td>${r.area}</td><td>${Number(r.qty||0).toLocaleString()}</td><td>${matOps("seedlingUsage", i)}</td></tr>`
+    ]));
+}
+/* ===== 导入 Excel ===== */
+const MAT_IMPORT_MAP = {
+  fertilizerUsage:   {label:"肥料使用", cols:["region","forest","block","code","area","material","spec","usage","place"], num:["area","usage"],
+    cands:{region:["林区"],forest:["林场"],block:["林班","地块","小班"],code:["代码"],area:["面积","亩"],material:["肥料","物料","品名"],spec:["规格"],usage:["使用量","用量","吨"],place:["地点","存放点","位置"]}},
+  fertilizerIssue: {label:"合作林发放", cols:["region","forest","village","farmer","code","area","material","spec","bags"], num:["area","bags"],
+    cands:{region:["林区"],forest:["林场"],village:["村","村庄"],farmer:["种植户","农户","户主"],code:["代码"],area:["面积","亩"],material:["肥料","物料"],spec:["规格"],bags:["袋数","袋"]}},
+  fertilizerStock: {label:"肥料库存", cols:["region","forest","place","material","spec","stock"], num:["stock"],
+    cands:{region:["林区"],forest:["林场"],place:["地点","存放点","位置"],material:["肥料","物料","品名"],spec:["规格"],stock:["库存","结存","剩余"]}},
+  herbicideStock: {label:"除草剂库存", cols:["region","forest","place","material","stock"], num:["stock"],
+    cands:{region:["林区"],forest:["林场"],place:["地点","存放点","位置"],material:["除草剂","物料","品名"],spec:["规格"],stock:["库存","结存","剩余"]}},
+  herbicideUsage:   {label:"除草剂使用", cols:["region","forest","block","code","area","contractor","material","usage","spec"], num:["area","usage"],
+    cands:{region:["林区"],forest:["林场"],block:["林班","地块","小班"],code:["代码"],area:["面积","亩"],contractor:["包商","承包商","承包人"],material:["除草剂","物料","品名"],usage:["使用量","用量","箱"],spec:["规格"]}},
+  seedlingUsage:  {label:"苗木使用", cols:["region","forest","block","code","area","qty"], num:["area","qty"],
+    cands:{region:["林区"],forest:["林场"],block:["林班","地块","小班"],code:["代码"],area:["面积","亩"],qty:["数量","株数","株"]}}
+};
+/* 自动识别表格类型：看表头特征词 + 物料内容样例 */
+function detectMaterialType(rows, headIdx, head){
+  const hs = head.map(h=>String(h||"").replace(/\s+/g,"")).filter(Boolean);
+  const has = (...ks)=>ks.some(k=>hs.some(h=>h.includes(k)));
+  if(has("包商","承包商")) return "herbicideUsage";            // 除草剂使用：包商独有
+  if(has("袋数","种植户","农户")) return "fertilizerIssue";   // 合作林发放：种植户/袋数独有
+  if(has("库存","结存")){                                // 库存类：看是肥料还是除草剂
+    if(has("除草剂")) return "herbicideStock";
+    if(has("肥料")) return "fertilizerStock";
+    const mi = hs.findIndex(x=>x.includes("物料")||x.includes("品名"));
+    if(mi>=0){
+      const sample = rows.slice(headIdx+1, headIdx+8).map(r=>String(r[mi]||"")).join("");
+      if(/草甘膦|除草剂|草铵膦|百草枯/.test(sample)) return "herbicideStock";
+      if(/复合肥|尿素|钙镁磷|磷酸/.test(sample)) return "fertilizerStock";
+    }
+    return "fertilizerStock";
+  }
+  if(has("使用量","用量")){                              // 使用类：看物料样例
+    const mi = hs.findIndex(x=>x.includes("物料")||x.includes("品名")||x.includes("除草剂")||x.includes("肥料"));
+    if(mi>=0){
+      const sample = rows.slice(headIdx+1, headIdx+8).map(r=>String(r[mi]||"")).join("");
+      if(/草甘膦|除草剂|草铵膦|百草枯/.test(sample)) return "herbicideUsage";
+    }
+    return "fertilizerUsage";
+  }
+  if(has("数量","株数")) return "seedlingUsage";              // 苗木使用：数量独有
+  return null;
+}
+function importMaterialExcel(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try{
+      const wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array"});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      // 定位表头行
+      let headIdx = -1;
+      for(let r=0; r<rows.length && r<10; r++){
+        if(String(rows[r][0]||"").includes("林区") || String(rows[r][1]||"").includes("林场")){ headIdx=r; break; }
+      }
+      if(headIdx<0){ alert("没找到表头行（第一列应为林区）"); return; }
+      const head = rows[headIdx];
+      // 自动识别表类型；识别不出才让用户手动选
+      let target = detectMaterialType(rows, headIdx, head);
+      if(!target){
+        const pick = prompt("没自动识别出表格类型，请手动输入要导入到哪个表（肥料使用 / 合作林发放 / 肥料库存 / 除草剂库存 / 除草剂使用 / 苗木使用）", "");
+        if(!pick) return;
+        target = Object.keys(MAT_IMPORT_MAP).find(k=>MAT_IMPORT_MAP[k].label===pick.trim());
+        if(!target){ alert("表名没识别出来，请按提示输入完整名称"); return; }
+      }
+      const cfg = MAT_IMPORT_MAP[target];
+      // 列映射：按候选词模糊匹配（兼容 清山面积/面积、袋数/数量、株数/数量 等叫法）
+      const colIdx = {};
+      cfg.cols.forEach((c,ci)=>{
+        const cands = cfg.cands[c] || [c];
+        const ci2 = head.findIndex(hh=>{ const hs=String(hh||"").replace(/\s+/g,""); return cands.some(cd=>hs.includes(cd)); });
+        if(ci2>=0) colIdx[c]=ci2;
+      });
+      let added = 0, skipped = 0;
+      for(let r=headIdx+1; r<rows.length; r++){
+        const row = rows[r];
+        if(!row || row.every(c=>String(c||"").trim()==="")) continue;
+        const rec = {};
+        cfg.cols.forEach(c=>{
+          const ci = colIdx[c];
+          let v = ci===undefined ? "" : String(row[ci]||"").trim();
+          if(cfg.num.includes(c)){ v = parseFloat(v); if(isNaN(v)) v=0; }
+          rec[c] = v;
+        });
+        if(!rec[cfg.cols[0]] && !rec[cfg.cols[2]]){ skipped++; continue; }  // 首行或林班都空则跳过
+        DB[target].push(rec); added++;
+      }
+      save(); renderMaterial();
+      alert(`已自动识别为「${cfg.label}」表并导入：新增 ${added} 条${skipped?`，跳过 ${skipped} 条空行`:""}`);
+    }catch(e){ alert("导入失败："+e.message); }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = "";
+}
+/* ================= 清点焚烧登记 ================= */
+function renderBurn(){
+  const list = DB.burnRecords.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const pend = list.filter(x=>x.status!=="已焚烧").length;
+  view.innerHTML = `
+    <div class="topbar"><h1>清点焚烧登记</h1></div>
+    <div class="stats">
+      <div class="stat"><div class="label">登记记录</div><div class="num">${list.length}<small> 条</small></div></div>
+      <div class="stat"><div class="label">待焚烧</div><div class="num" style="color:var(--orange)">${pend}</div></div>
+      <div class="stat"><div class="label">已焚烧</div><div class="num" style="color:var(--green)">${list.length-pend}</div></div>
+    </div>
+    <div class="card">
+      <form onsubmit="addBurn(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
+        <div class="field"><label>地点</label><input name="place" required placeholder="如：班东仓库"></div>
+        <div class="field"><label>物品</label><select name="type"><option>肥料袋</option><option>除草剂瓶</option><option>肥料袋+除草剂瓶</option></select></div>
+        <div class="field"><label>数量</label><input type="number" name="count" required min="1" placeholder="袋/瓶数"></div>
+        <div class="field"><label>状态</label><select name="status"><option>已清点待焚烧</option><option>已焚烧</option></select></div>
+        <div class="field"><label>备注</label><input name="note" placeholder="可选"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">登记</button></div>
+      </form>
+    </div>
+    <div class="card">${matTable(["日期","地点","物品","数量","状态","备注","操作"],
+      list.map((x,i)=>`<tr>
+        <td>${esc(x.date)}</td><td>${esc(x.place)}</td><td>${esc(x.type)}</td><td>${x.count}</td>
+        <td style="color:${x.status==="已焚烧"?"var(--green)":"var(--orange)"}">${esc(x.status)}</td>
+        <td>${esc(x.note)}</td>
+        <td><button class="btn" onclick="burnDone(${i})">${x.status==="已焚烧"?"回退":"标焚烧"}</button> <button class="btn danger" onclick="delRec('burnRecords',${i})">删</button></td></tr>`))}
+    </div>`;
+}
+function addBurn(e){
+  e.preventDefault();
+  const f = e.target;
+  DB.burnRecords.push({date:f.date.value, place:f.place.value.trim(), type:f.type.value, count:Number(f.count.value), status:f.status.value, note:f.note.value.trim()});
+  save(); renderBurn();
+}
+function burnDone(i){
+  DB.burnRecords[i].status = DB.burnRecords[i].status==="已焚烧" ? "已清点待焚烧" : "已焚烧";
+  save(); renderBurn();
+}
+
+/* ================= 林场整改台账 ================= */
+const FORESTS = ["班更","班昆","帕罗","恒鲁安","祖晃","考更","拉火","首显","阿多","沙等"];
+function renderInspect(){
+  const list = DB.inspectRecords.slice().sort((a,b)=>(b.foundDate||"").localeCompare(a.foundDate||""));
+  const cnt = s => list.filter(x=>x.status===s).length;
+  view.innerHTML = `
+    <div class="topbar"><h1>林场整改台账</h1></div>
+    <div class="stats">
+      <div class="stat"><div class="label">整改记录</div><div class="num">${list.length}</div></div>
+      <div class="stat"><div class="label">待整改</div><div class="num" style="color:var(--orange)">${cnt("待整改")}</div></div>
+      <div class="stat"><div class="label">已整改</div><div class="num" style="color:var(--blue)">${cnt("已整改")}</div></div>
+      <div class="stat"><div class="label">复核通过</div><div class="num" style="color:var(--green)">${cnt("复核通过")}</div></div>
+    </div>
+    <div class="card">
+      <form onsubmit="addInspect(event)">
+        <div class="field"><label>林场</label><input name="forest" list="forestList" required placeholder="如：恒鲁安"><datalist id="forestList">${FORESTS.map(f=>`<option value="${f}">`).join("")}</datalist></div>
+        <div class="field"><label>整改点</label><input name="point" required placeholder="如：3号林班补植区"></div>
+        <div class="field" style="flex:1;min-width:200px"><label>问题描述</label><input name="issue" placeholder="问题内容"></div>
+        <div class="field"><label>责任人</label><input name="owner" placeholder="姓名"></div>
+        <div class="field"><label>发现日期</label><input type="date" name="foundDate" value="${todayStr()}" required></div>
+        <div class="field"><label>状态</label><select name="status"><option>待整改</option><option>已整改</option><option>复核通过</option></select></div>
+        <div class="field"><label>完成日期</label><input type="date" name="doneDate"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">添加</button></div>
+      </form>
+    </div>
+    <div class="card">${matTable(["林场","整改点","问题","责任人","发现日期","状态","完成日期","备注","操作"],
+      list.map((x,i)=>{
+        const late = x.status==="待整改" && x.foundDate && (Date.now()-new Date(x.foundDate).getTime())>30*864e5;
+        return `<tr>
+          <td>${esc(x.forest)}</td><td>${esc(x.point)}</td><td>${esc(x.issue)}</td><td>${esc(x.owner)}</td>
+          <td>${esc(x.foundDate)}${late?' <span style="color:var(--red)">超期</span>':""}</td>
+          <td style="color:${x.status==="复核通过"?"var(--green)":x.status==="已整改"?"var(--blue)":"var(--orange)"}">${esc(x.status)}</td>
+          <td>${esc(x.doneDate)}</td><td>${esc(x.note)}</td>
+          <td><button class="btn" onclick="inspectNext(${i})">推进</button> <button class="btn danger" onclick="delRec('inspectRecords',${i})">删</button></td></tr>`;}))}
+    </div>`;
+}
+function addInspect(e){
+  e.preventDefault(); const f = e.target;
+  DB.inspectRecords.push({forest:f.forest.value.trim(), point:f.point.value.trim(), issue:f.issue.value.trim(),
+    owner:f.owner.value.trim(), foundDate:f.foundDate.value, status:f.status.value, doneDate:f.doneDate.value||"", note:f.note?f.note.value.trim():""});
+  save(); renderInspect();
+}
+function inspectNext(i){
+  const seq = ["待整改","已整改","复核通过"];
+  const cur = seq.indexOf(DB.inspectRecords[i].status);
+  DB.inspectRecords[i].status = seq[(cur+1)%3];
+  if(DB.inspectRecords[i].status!=="待整改" && !DB.inspectRecords[i].doneDate) DB.inspectRecords[i].doneDate = todayStr();
+  save(); renderInspect();
+}
+
+/* ================= 苗木成活率 ================= */
+function renderSeedling(){
+  const list = DB.seedlingRecords.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const totArea = list.reduce((a,r)=>a+Number(r.area||0),0);
+  const totP = list.reduce((a,r)=>a+Number(r.planted||0),0);
+  const totS = list.reduce((a,r)=>a+Number(r.survived||0),0);
+  const rate = totP? (totS/totP*100).toFixed(1) : 0;
+  view.innerHTML = `
+    <div class="topbar"><h1>苗木成活率核算</h1></div>
+    <div class="stats">
+      <div class="stat"><div class="label">核算地块</div><div class="num">${list.length}<small> 个</small></div></div>
+      <div class="stat"><div class="label">合计面积</div><div class="num">${totArea}<small> ${list[0]?.unit||"亩"}</small></div></div>
+      <div class="stat"><div class="label">总成活率</div><div class="num" style="color:var(--green)">${rate}<small>%</small></div></div>
+    </div>
+    <div class="card">
+      <form onsubmit="addSeedling(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
+        <div class="field"><label>林场</label><input name="forest" list="forestList" required></div>
+        <div class="field"><label>林班/地块</label><input name="block" required placeholder="如：3号林班"></div>
+        <div class="field"><label>面积</label><input type="number" step="0.01" name="area" required></div>
+        <div class="field"><label>单位</label><select name="unit"><option>亩</option><option>公顷</option></select></div>
+        <div class="field"><label>种植株数</label><input type="number" name="planted" required></div>
+        <div class="field"><label>成活株数</label><input type="number" name="survived" required></div>
+        <div class="field"><label>备注</label><input name="note"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">添加</button></div>
+      </form>
+      <div style="font-size:12px;color:var(--sub)">1 公顷 = 15 亩 · 成活率自动计算</div>
+    </div>
+    <div class="card">${matTable(["日期","林场","林班","面积","单位","种植","成活","成活率","备注","操作"],
+      list.map((x,i)=>`<tr>
+        <td>${esc(x.date)}</td><td>${esc(x.forest)}</td><td>${esc(x.block)}</td><td>${x.area}</td><td>${esc(x.unit)}</td>
+        <td>${x.planted}</td><td>${x.survived}</td>
+        <td style="color:var(--green);font-weight:600">${x.planted?(x.survived/x.planted*100).toFixed(1):0}%</td>
+        <td>${esc(x.note)}</td><td><button class="btn danger" onclick="delRec('seedlingRecords',${i})">删</button></td></tr>`))}
+    </div>`;
+}
+function addSeedling(e){
+  e.preventDefault(); const f = e.target;
+  DB.seedlingRecords.push({date:f.date.value, forest:f.forest.value.trim(), block:f.block.value.trim(),
+    area:Number(f.area.value), unit:f.unit.value, planted:Number(f.planted.value), survived:Number(f.survived.value), note:f.note.value.trim()});
+  save(); renderSeedling();
+}
+
+/* ================= 验收资料台账 ================= */
+function renderArchive(){
+  const list = DB.archiveRecords.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const cnt = s => list.filter(x=>x.status===s).length;
+  view.innerHTML = `
+    <div class="topbar"><h1>验收资料台账</h1></div>
+    <div class="stats">
+      <div class="stat"><div class="label">资料条目</div><div class="num">${list.length}</div></div>
+      <div class="stat"><div class="label">待整理</div><div class="num" style="color:var(--orange)">${cnt("待整理")}</div></div>
+      <div class="stat"><div class="label">已归档</div><div class="num" style="color:var(--blue)">${cnt("已归档")}</div></div>
+      <div class="stat"><div class="label">已发办公室</div><div class="num" style="color:var(--green)">${cnt("已发送办公室")}</div></div>
+    </div>
+    <div class="card">
+      <form onsubmit="addArchive(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
+        <div class="field"><label>类型</label><select name="type"><option>验收表</option><option>验收照片</option><option>工作日志</option><option>考勤表</option><option>其他</option></select></div>
+        <div class="field" style="flex:1;min-width:180px"><label>资料名称</label><input name="name" required placeholder="如：9月验收照片"></div>
+        <div class="field"><label>所属项目</label><input name="project" placeholder="如：色奔东"></div>
+        <div class="field"><label>状态</label><select name="status"><option>待整理</option><option>已归档</option><option>已发送办公室</option></select></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">添加</button></div>
+      </form>
+    </div>
+    <div class="card">${matTable(["日期","类型","资料名称","所属项目","状态","操作"],
+      list.map((x,i)=>`<tr><td>${esc(x.date)}</td><td>${esc(x.type)}</td><td>${esc(x.name)}</td><td>${esc(x.project)}</td>
+        <td style="color:${x.status==="已发送办公室"?"var(--green)":x.status==="已归档"?"var(--blue)":"var(--orange)"}">${esc(x.status)}</td>
+        <td><button class="btn" onclick="archiveNext(${i})">推进</button> <button class="btn danger" onclick="delRec('archiveRecords',${i})">删</button></td></tr>`))}
+    </div>`;
+}
+function addArchive(e){
+  e.preventDefault(); const f = e.target;
+  DB.archiveRecords.push({date:f.date.value, type:f.type.value, name:f.name.value.trim(), project:f.project.value.trim(), status:f.status.value});
+  save(); renderArchive();
+}
+function archiveNext(i){
+  const seq = ["待整理","已归档","已发送办公室"];
+  const cur = seq.indexOf(DB.archiveRecords[i].status);
+  DB.archiveRecords[i].status = seq[(cur+1)%3];
+  save(); renderArchive();
+}
+
+/* ================= 林地台账 ================= */
+let forestTab = "owned";      // owned=自营林 | coop=合作林
+let forestF = {forest:"", kw:""};
+let forestEdit = null;   // {coll,i}
+let forestLimit = 300;   // 合作林分页：每次显示条数
+function forestSlice(list){
+  if(forestTab==="coop" && list.length>forestLimit) return list.slice(0, forestLimit);
+  return list;
+}
+let forestNew = false;
+const FOREST_FIELDS = {
+  owned: [{k:"region",l:"林区"},{k:"forest",l:"林场"},{k:"block",l:"林班"},{k:"code",l:"林班代码"},{k:"area",l:"种植面积"},{k:"terrain",l:"山地/平地"},{k:"areaA",l:"A类面积"},{k:"areaB",l:"B类面积"},{k:"areaC",l:"C类面积"},{k:"areaD",l:"D类面积"},{k:"manager",l:"林区经理"},{k:"mgrPhone",l:"经理电话"},{k:"fieldMgr",l:"林场场长"},{k:"fieldPhone",l:"场长电话"},{k:"admin",l:"现场管理员"},{k:"adminPhone",l:"管理员电话"},{k:"process",l:"作业工序"},{k:"progress",l:"进度"},{k:"accept",l:"验收情况"}],
+  coop: [{k:"region",l:"林区"},{k:"forest",l:"林场"},{k:"county",l:"县"},{k:"village",l:"村"},{k:"farmer",l:"种植户"},{k:"mode",l:"合作模式"},{k:"oldCode",l:"旧林班代码"},{k:"newCode",l:"新林班代码"},{k:"area",l:"种植面积"},{k:"year",l:"种植年份"},{k:"manager",l:"林区经理"},{k:"mgrPhone",l:"经理电话"},{k:"fieldMgr",l:"林场场长"},{k:"fieldPhone",l:"场长电话"},{k:"admin",l:"现场管理员"},{k:"adminPhone",l:"管理员电话"}]
+};
+const FOREST_NUM = { owned:["area","areaA","areaB","areaC","areaD"], coop:["area","year"] };
+function forestList(){ return forestTab==="owned" ? DB.forestOwned : DB.forestCoop; }
+function forestFilter(r){
+  if(forestF.forest && r.forest!==forestF.forest) return false;
+  if(forestF.kw){
+    const kw = forestF.kw.toLowerCase();
+    const hay = [r.region,r.forest,r.block,r.code,r.county,r.village,r.farmer,r.mode,r.manager,r.fieldMgr,r.admin].join(" ").toLowerCase();
+    if(!hay.includes(kw)) return false;
+  }
+  return true;
+}
+function renderForest(){
+  const all = forestList();
+  const list = all.map((r,di)=>({r,di})).filter(x=>forestFilter(x.r));
+  const shown = forestSlice(list);
+  const areaSum = list.reduce((a,x)=>a+(parseFloat(x.r.area)||0),0);
+  const forests = [...new Set(all.map(r=>r.forest).filter(Boolean))].sort();
+  const coll = forestTab==="owned" ? "forestOwned" : "forestCoop";
+  view.innerHTML = `
+    <div class="topbar"><h1>林地台账（色奔东林区）</h1>
+      <div class="btns">
+        <button class="btn ${forestTab==="owned"?"primary":""}" onclick="forestTab='owned';forestLimit=300;renderForest()">自营林</button>
+        <button class="btn ${forestTab==="coop"?"primary":""}" onclick="forestTab='coop';renderForest()">合作林</button>
+        <button class="btn primary" onclick="document.getElementById('forestFile').click()">导入 Excel</button>
+        <input type="file" id="forestFile" accept=".xlsx,.xls" style="display:none" onchange="importForestExcel(this)">
+      </div></div>
+    <div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:13px;color:var(--sub)">筛选：</span>
+      <select onchange="forestF.forest=this.value;renderForest()" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+        <option value="">全部林场</option>${forests.map(f=>`<option ${forestF.forest===f?"selected":""}>${esc(f)}</option>`).join("")}</select>
+      <input id="forestKw" placeholder="搜索林班/代码/种植户/村/县…" value="${esc(forestF.kw)}" onkeydown="if(event.key==='Enter'){forestF.kw=this.value.trim();renderForest()}" style="flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+      <button class="btn" onclick="forestF.kw=document.getElementById('forestKw').value.trim();renderForest()">搜索</button>
+      <button class="btn" onclick="forestF={forest:'',kw:''};forestLimit=300;renderForest()">清除</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="label">${forestTab==="owned"?"自营林地块":"合作林地块"}</div><div class="num">${list.length}<small> 块</small></div></div>
+      <div class="stat"><div class="label">合计面积</div><div class="num">${fmtKip(areaSum.toFixed(2))}<small> ha</small></div></div>
+      ${forestTab==="coop"&&list.length>forestLimit?`<div class="stat"><div class="label">已显示</div><div class="num">${forestLimit}<small> / ${list.length}</small></div></div>`:""}
+    </div>
+    <div class="card" style="padding:8px 14px;margin-bottom:12px">
+      <button class="btn primary" onclick="forestNew=true;renderForest()">+ 新增地块</button>
+      <span style="font-size:12px;color:var(--sub);margin-left:8px">${forestTab==="owned"?"自营林":"合作林"}记录，可新增、修改、删除</span></div>
+    ${forestNew ? forestForm() : ""}`;
+  if(forestTab==="owned"){
+    view.innerHTML += matTable(["林区","林场","林班","林班代码","种植面积","山地/平地","A类","B类","C类","D类","经理","场长","管理员","作业工序","进度","验收情况","操作"],
+      shown.flatMap(x=>[
+        forestEditRow(coll, x.di, 17),
+        `<tr><td>${esc(x.r.region)}</td><td>${esc(x.r.forest)}</td><td>${esc(x.r.block)}</td><td>${esc(x.r.code)}</td><td>${x.r.area}</td><td>${esc(x.r.terrain)}</td><td>${x.r.areaA}</td><td>${x.r.areaB}</td><td>${x.r.areaC}</td><td>${x.r.areaD}</td><td>${esc(x.r.manager)}</td><td>${esc(x.r.fieldMgr)}</td><td>${esc(x.r.admin)}</td><td style="font-size:12px">${esc(x.r.process)}</td><td>${esc(x.r.progress)}</td><td>${esc(x.r.accept)}</td><td>${forestOps(coll, x.di)}</td></tr>`
+      ]));
+  }else{
+    view.innerHTML += matTable(["林区","林场","县","村","种植户","合作模式","旧代码","新代码","面积","年份","经理","场长","管理员","操作"],
+      shown.flatMap(x=>[
+        forestEditRow(coll, x.di, 14),
+        `<tr><td>${esc(x.r.region)}</td><td>${esc(x.r.forest)}</td><td>${esc(x.r.county)}</td><td>${esc(x.r.village)}</td><td>${esc(x.r.farmer)}</td><td>${esc(x.r.mode)}</td><td style="font-size:12px">${esc(x.r.oldCode)}</td><td style="font-size:12px">${esc(x.r.newCode)}</td><td>${x.r.area}</td><td>${x.r.year}</td><td>${esc(x.r.manager)}</td><td>${esc(x.r.fieldMgr)}</td><td>${esc(x.r.admin)}</td><td>${forestOps(coll, x.di)}</td></tr>`
+      ]));
+    if(list.length>forestLimit){
+      view.innerHTML += `<div class="card" style="text-align:center;padding:10px">
+        <button class="btn primary" onclick="forestLimit+=300;renderForest()">显示更多（+300 条，共 ${list.length} 条）</button></div>`;
+    }
+  }
+}
+function forestOps(coll, i){
+  return `<button class="btn" onclick="forestEdit={coll:'${coll}',i:${i}};renderForest()">改</button>
+    <button class="btn danger" onclick="forestDel('${coll}',${i})">删</button>`;
+}
+function forestDel(coll, i){ if(confirm("删除这条记录？")){ DB[coll].splice(i,1); save(); renderForest(); } }
+function forestForm(){
+  const fields = FOREST_FIELDS[forestTab];
+  const coll = forestTab==="owned" ? "forestOwned" : "forestCoop";
+  return `<div class="card" style="margin-bottom:12px;padding:14px"><form onsubmit="forestSave(event)" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+    ${fields.map(f=>`<div class="field" style="margin:0"><label>${f.l}</label><input name="${f.k}" ${FOREST_NUM[forestTab].includes(f.k)?'type="number" step="0.01"':''} value="${f.k==="region"?"色奔东林区":""}"></div>`).join("")}
+    <button class="btn primary" type="submit">保存</button>
+    <button type="button" class="btn" onclick="forestNew=false;renderForest()">取消</button></form></div>`;
+}
+function forestSave(e){
+  e.preventDefault(); const f = e.target;
+  const coll = forestTab==="owned" ? "forestOwned" : "forestCoop";
+  const rec = {};
+  FOREST_FIELDS[forestTab].forEach(fd=>{
+    let v = (f[fd.k]?f[fd.k].value:"").trim();
+    if(FOREST_NUM[forestTab].includes(fd.k)){ v = parseFloat(v); if(isNaN(v)) v=0; }
+    rec[fd.k] = v;
+  });
+  DB[coll].push(rec); forestNew=false; save(); renderForest();
+}
+function forestEditRow(coll, i, colCount){
+  if(!(forestEdit && forestEdit.coll===coll && forestEdit.i===i)) return "";
+  const r = DB[coll][i];
+  const tab = coll==="forestOwned" ? "owned" : "coop";
+  const fields = FOREST_FIELDS[tab];
+  return `<tr><td colspan="${colCount}" style="background:var(--bg)"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+    ${fields.map(f=>`<div class="field" style="margin:0"><label>${f.l}</label><input id="fe_${f.k}" ${FOREST_NUM[tab].includes(f.k)?'type="number" step="0.01"':''} value="${esc(String(r[f.k]??""))}"></div>`).join("")}
+    <button class="btn primary" onclick="forestEditSave('${coll}',${i})">保存</button>
+    <button class="btn" onclick="forestEdit=null;renderForest()">取消</button></div></td></tr>`;
+}
+function forestEditSave(coll, i){
+  const tab = coll==="forestOwned" ? "owned" : "coop";
+  FOREST_FIELDS[tab].forEach(fd=>{
+    const el = document.getElementById("fe_"+fd.k);
+    if(el){ let v = el.value.trim(); if(FOREST_NUM[tab].includes(fd.k)){ v=parseFloat(v); if(isNaN(v)) v=0; } DB[coll][i][fd.k] = v; }
+  });
+  forestEdit = null; save(); renderForest();
+}
+/* 林地 Excel 导入：自动识别自营林/合作林 */
+function importForestExcel(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try{
+      const wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array"});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      let headIdx = -1;
+      for(let r=0; r<rows.length && r<10; r++){
+        if(String(rows[r][0]||"").includes("林区")){ headIdx=r; break; }
+      }
+      if(headIdx<0){ alert("没找到表头行（第一列应为林区）"); return; }
+      const head = rows[headIdx];
+      const hs = head.map(x=>String(x||"").replace(/\\s+/g,""));
+      const isCoop = hs.some(x=>x.includes("种植户")) || hs.some(x=>x.includes("合作模式"));
+      const tab = isCoop ? "coop" : "owned";
+      const coll = isCoop ? "forestCoop" : "forestOwned";
+      const fields = FOREST_FIELDS[tab];
+      // 列映射（按候选词）
+      const cands = {
+        region:["林区"], forest:["林场"], block:["林班","地块"], code:["林班代码","代码"],
+        county:["县"], village:["村"], farmer:["种植户","农户"], mode:["合作模式"],
+        oldCode:["旧林班代码","旧代码"], newCode:["新林班代码","新代码"],
+        area:["种植面积","面积"], year:["种植年份","年份"],
+        terrain:["山地/平地","山地","平地"], areaA:["A类面积"], areaB:["B类面积"], areaC:["C类面积"], areaD:["D类面积"],
+        manager:["林区经理"], mgrPhone:["联系方式"], fieldMgr:["林场场长"], fieldPhone:["联系方式"], admin:["现场管理员"], adminPhone:["联系方式"],
+        process:["作业工序"], progress:["进度"], accept:["验收情况"]
+      };
+      const colIdx = {};
+      fields.forEach(fd=>{
+        const cand = cands[fd.k] || [fd.k];
+        const ci = head.findIndex(hh=>{ const s=String(hh||"").replace(/\\s+/g,""); return cand.some(c=>s.includes(c)); });
+        if(ci>=0) colIdx[fd.k]=ci;
+      });
+      let added=0, skipped=0, other=0;
+      for(let r=headIdx+1; r<rows.length; r++){
+        const row = rows[r];
+        if(!row || row.every(c=>String(c||"").trim()==="")) continue;
+        const rec = {};
+        let hasData = false;
+        fields.forEach(fd=>{
+          const ci = colIdx[fd.k];
+          let v = ci===undefined ? "" : String(row[ci]||"").trim();
+          if(FOREST_NUM[tab].includes(fd.k)){ v = parseFloat(v); if(isNaN(v)) v=0; else hasData=true; }
+          if(v!=="") hasData = true;
+          rec[fd.k] = v;
+        });
+        if(!hasData){ skipped++; continue; }
+        if(rec.region && rec.region!=="色奔东林区" && rec.region!=="班东林区" && rec.region!==""){ other++; }
+        if(rec.region==="班东林区") rec.region = "色奔东林区";
+        DB[coll].push(rec); added++;
+      }
+      save(); renderForest();
+      alert(`已识别为「${tab==="coop"?"合作林":"自营林"}」表并导入 ${added} 条${skipped?`，跳过 ${skipped} 条空行`:""}${other?`，另有 ${other} 条非色奔东/班东林区的数据也已导入（可在林区列查看）`:""}`);
+    }catch(e){ alert("导入失败："+e.message); }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = "";
+}
+
+/* ================= 每日工作记录（含工作日志子板块） ================= */
+let wlMonth = "all";
+let wlEdit = null;   // {i} 工作日志表格内行编辑
+let workLogOpen = false;   // 工作日志折叠区是否展开
+function renderWork(){
+  const cur = monthStr();
+  const t = todayStr();
+  const monthRecs = (DB.workLogs||[]).filter(x=>x.date.startsWith(cur) && (x.content||x.place||x.mileage)).sort((a,b)=>b.date.localeCompare(a.date));   // 最新日期排最上，方便修改
+  view.innerHTML = `
+    <div class="topbar"><h1>每日工作记录</h1></div>
+    <div class="card">
+      <form onsubmit="addWorkLog(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${t}" required></div>
+        <div class="field full"><label>工作地点（点选常用，也可手动补充）</label>
+          <div class="loc-pick" id="locPick">
+            ${["班东","色奔","中心苗圃","孟农","公司"].map(l=>`<label><input type="checkbox" name="loc" value="${l}">${l}</label>`).join("")}
+          </div>
+          <input name="locOther" placeholder="其他地点（多个用顿号分隔，选填）" style="margin-top:8px">
+        </div>
+        <div class="field"><label>车辆里程 (km)</label><input name="mileage" placeholder="当天里程表读数，选填" style="width:160px"></div>
+        <div class="field full"><label>工作内容</label><textarea name="content" rows="2" placeholder="今天做了什么？" required></textarea></div>
+        <div class="field"><label>状态</label><select name="done"><option value="1">已完成</option><option value="0">进行中</option></select></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">保存记录</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <h3>本月记录<span class="meta">${+cur.slice(5,7)}月 ${monthRecs.length} 天</span></h3>
+      <table>
+        <colgroup><col style="width:11%"><col style="width:15%"><col style="width:12%"><col style="width:40%"><col style="width:12%"><col style="width:10%"></colgroup>
+        <tr><th>日期</th><th>工作地点</th><th>车辆里程</th><th>工作内容</th><th>状态</th><th></th></tr>
+        ${monthRecs.map(r=>{
+          const gi = DB.workLogs.indexOf(r);
+          const d = r.date.split("-");
+          if(wlEdit && wlEdit.i===gi) return `<tr><td colspan="6" style="padding:10px 4px">${wlForm(gi)}</td></tr>`;
+          return `<tr>
+            <td>${+d[1]}月${+d[2]}日</td>
+            <td>${esc(r.place||"—")}</td>
+            <td>${esc(r.mileage||"—")}</td>
+            <td style="white-space:pre-wrap">${esc(r.content||"")}</td>
+            <td>${r.done?'<span class="pill ok">完成</span>':'<span class="pill wait">进行中</span>'}</td>
+            <td><button class="btn" onclick="wlEdit={i:${gi}};renderWork()">改</button>
+                <button class="btn danger" onclick="delRec('workLogs',${gi})">删</button></td>
+          </tr>`;
+        }).join("") || '<tr><td colspan="6" class="empty">本月还没有记录，上面填一条吧</td></tr>'}
+      </table>
+      <div style="font-size:12px;color:var(--sub);margin-top:6px">每天的记录自动进入下方「工作日志（历史档案）」，月底一键导出 Excel。</div>
+    </div>
+    <div class="card">
+      <div class="km-bar" style="cursor:pointer;user-select:none" onclick="workLogOpen=!workLogOpen;renderWork()">工作日志（历史档案）<span style="float:right;font-weight:400;font-size:12px">${workLogOpen?"▲ 收起":"▼ 点击展开"}</span></div>
+      ${workLogOpen ? wlSection() : ""}
+    </div>`;
+  // 多选样式切换
+  document.querySelectorAll("#locPick label").forEach(lb=>{
+    lb.addEventListener("click", e=>{ e.preventDefault(); const cb=lb.querySelector("input"); cb.checked=!cb.checked; lb.classList.toggle("on", cb.checked); });
+  });
+}
+function addWorkLog(e){
+  e.preventDefault(); const f = e.target;
+  const locs = [...f.querySelectorAll("input[name=loc]:checked")].map(c=>c.value);
+  (f.locOther.value||"").split(/[、,，\s]+/).forEach(s=>{ if(s) locs.push(s); });
+  const date = f.date.value;
+  const rec = {date, place:locs.join("、"), mileage:f.mileage.value.trim(), content:f.content.value.trim(), done:f.done.value==="1"};
+  const ex = DB.workLogs.findIndex(x=>x.date===date);
+  if(ex>=0){ DB.workLogs[ex] = Object.assign({}, DB.workLogs[ex], rec); toast("已更新当天记录"); }
+  else { DB.workLogs.push(rec); toast("已保存"); }
+  syncKmBoth(rec.date, rec.mileage);
+  save(); renderWork();
+}
+/* 工作日志子板块：展开后显示（月份筛选 + 导出 + 完整表格；"全部月份"视图不含当月，当月在上面"本月记录"查看） */
+function wlSection(){
+  const curMonth = monthStr();
+  const list = DB.workLogs.slice().sort((a,b)=>a.date.localeCompare(b.date))
+    .filter(r=> wlMonth!=="all" ? r.date.startsWith(wlMonth) : !r.date.startsWith(curMonth));
+  const months = [...new Set(list.map(x=>x.date.slice(0,7)))].sort();
+  return `
+    <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select onchange="wlMonth=this.value;renderWork()" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+        <option value="all">全部月份</option>${months.map(m=>`<option ${wlMonth===m?"selected":""}>${m}</option>`).join("")}</select>
+      <button class="btn primary" onclick="exportWorkLogExcel()">导出 Excel（公司模板）</button>
+      <span style="font-size:12px;color:var(--sub)">每月里程一览请到「摩托车里程」查看</span>
+    </div>
+    <table>
+      <colgroup><col style="width:13%"><col style="width:17%"><col style="width:11%"><col style="width:50%"><col style="width:9%"></colgroup>
+      <tr><th>日期</th><th>工作地点</th><th>车辆里程</th><th>主要工作内容</th><th></th></tr>
+      ${list.map(r=>{
+        if(wlMonth!=="all" && r.date.slice(0,7)!==wlMonth) return "";
+        const gi = DB.workLogs.indexOf(r);
+        if(wlEdit && wlEdit.i===gi) return `<tr><td colspan="5" style="padding:10px 4px">${wlForm(gi)}</td></tr>`;
+        const d = r.date.split("-");
+        return `<tr>
+          <td>${+d[1]}月${+d[2]}日</td>
+          <td>${esc(r.place||"—")}</td>
+          <td>${esc(r.mileage||"—")}</td>
+          <td style="white-space:pre-wrap">${esc(r.content||"")}</td>
+          <td><button class="btn" onclick="wlEdit={i:${gi}};renderWork()">改</button>
+              <button class="btn danger" onclick="delRec('workLogs',${gi})">删</button></td>
+        </tr>`;
+      }).join("") || '<tr><td colspan="5" class="empty">该月份暂无记录</td></tr>'}
+    </table>`;
+}
+function wlPickLoc(loc, form){
+  const inp = form.querySelector('input[name=place]');
+  const cur = (inp.value||"").split(/[、,，]/).map(s=>s.trim()).filter(Boolean);
+  if(cur.includes(loc)) inp.value = cur.filter(x=>x!==loc).join("、");
+  else { cur.push(loc); inp.value = cur.join("、"); }
+}
+function wlForm(i){
+  const r = i>=0 ? DB.workLogs[i] : {date:todayStr(),place:"",mileage:"",content:"",weather:""};
+  return `<div style="background:#f8fafc;border:1px dashed var(--line);border-radius:8px;padding:12px 10px;margin-bottom:4px">
+    <form onsubmit="wlSave(event,${i})" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <div class="field" style="margin:0"><label>日期</label><input type="date" name="date" value="${r.date}" required></div>
+      <div class="field" style="margin:0"><label>工作地点</label><input name="place" value="${esc(r.place)}" placeholder="点选或手动输入" style="width:150px"></div>
+      <div class="field" style="margin:0"><label>车辆里程</label><input name="mileage" value="${esc(r.mileage)}" placeholder="如：29813" style="width:100px"></div>
+      <div class="field" style="margin:0"><label>天气(选填)</label><input name="weather" value="${esc(r.weather)}" placeholder="如：晴" style="width:100px"></div>
+      <div class="field" style="margin:0;flex:1;min-width:220px"><label>主要工作内容</label><textarea name="content" rows="2" style="width:100%">${esc(r.content)}</textarea></div>
+      <button class="btn primary" type="submit">保存</button>
+      <button type="button" class="btn" onclick="wlEdit=null;renderWork()">取消</button>
+    </form>
+    <div style="margin-top:6px;font-size:12px;color:var(--sub)">常用地点：
+      ${["班东","色奔","中心苗圃","孟农","公司"].map(l=>`<button type="button" class="btn" style="padding:2px 10px;margin-right:6px" onclick="wlPickLoc('${l}',this.form)">${l}</button>`).join("")}
+    </div></div>`;
+}
+function wlSave(e, i){
+  e.preventDefault(); const f = e.target;
+  const rec = {date:f.date.value, place:f.place.value.trim(), mileage:f.mileage.value.trim(),
+    content:f.content.value.trim(), weather:f.weather.value.trim(),
+    done: i>=0 ? !!(DB.workLogs[i]&&DB.workLogs[i].done) : false};
+  if(i>=0) DB.workLogs[i] = rec; else DB.workLogs.push(rec);
+  syncKmBoth(rec.date, rec.mileage);
+  wlEdit = null; save(); renderWork();
+}
+/* 导出：复刻公司《考核部外勤工作日志》模板，每月一个 sheet，3天一组 */
+function exportWorkLogExcel(){
+  const list = DB.workLogs.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  if(!list.length){ alert("暂无工作日志可导出"); return; }
+  const months = [...new Set(list.map(x=>x.date.slice(0,7)))].sort();
+  const wb = XLSX.utils.book_new();
+  months.forEach(ym=>{
+    const ms = list.filter(x=>x.date.startsWith(ym));
+    const aoa = [["考核部外勤工作日志","",""], ["姓名：刘琪伟","区域/岗位名称：合作部考核员","上级直接主管：杜国平"]];
+    for(let g=0; g<ms.length; g+=3){
+      const grp = ms.slice(g, g+3);
+      const fmtd = grp.map(r=>{
+        const p = r.date.split("-");
+        return "日期:" + (+p[0]) + "年  " + (+p[1]) + "月" + (+p[2]) + "日";
+      });
+      while(fmtd.length<3) fmtd.push("");
+      aoa.push(fmtd);
+      const plc = grp.map(r=>"工作地点："+(r.place||""));
+      while(plc.length<3) plc.push("");
+      aoa.push(plc);
+      if(grp.some(r=>r.weather)){
+        const wt = grp.map(r=>"天气情况："+(r.weather||""));
+        while(wt.length<3) wt.push("");
+        aoa.push(wt);
+      }
+      const km = grp.map(r=>"车辆里程："+(r.mileage||""));
+      while(km.length<3) km.push("");
+      aoa.push(km);
+      const ct = grp.map(r=>"主要工作内容："+(r.content||""));
+      while(ct.length<3) ct.push("");
+      aoa.push(ct);
+    }
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{wch:32},{wch:32},{wch:32}];
+    ws["!rows"] = [{hpt:22},{hpt:18}];
+    XLSX.utils.book_append_sheet(wb, ws, (+ym.split("-")[1])+"月");
+  });
+  XLSX.writeFile(wb, "考核部外勤工作日志-刘琪伟2026.xlsx");
+  toast("已导出 Excel（每月一个表）");
+}
+
+/* ================= 常用语库 ================= */
+const PHRASE_SEED = [
+  {text:"参与苗圃临时工工资发放，共计___个工，发放工资___万基普，已核对用工考勤无误。", category:"工资"},
+  {text:"整理本月工作日志、验收表、验收照片等资料发送办公室。", category:"资料"},
+  {text:"巡查___林场，检查整改点___，复查整改完成情况。", category:"巡查"},
+  {text:"参与___林班施肥作业，使用复合肥___吨。", category:"生产"},
+  {text:"清点并焚烧肥料袋___个、除草剂瓶___个，并做好台账记录。", category:"清点"},
+  {text:"跟进___林场除草剂使用，使用草甘膦___箱。", category:"生产"}
+];
+function renderPhrases(){
+  const list = DB.phrases;
+  if(!list.length){ DB.phrases = PHRASE_SEED.map(p=>({...p})); save(); }
+  view.innerHTML = `
+    <div class="topbar"><h1>常用语库</h1>
+      <div class="btns"><button class="btn primary" onclick="addPhrase()">新增常用语</button></div></div>
+    <div class="card">
+      <div style="font-size:13px;color:var(--sub);margin-bottom:10px">点击条目复制，回到「工作日志 / 每日汇报」直接粘贴；带 ___ 的位置自己填数字。</div>
+      ${DB.phrases.map((p,i)=>`<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--blue-soft)">
+        <span class="meta">${esc(p.category||"通用")}</span>
+        <span style="flex:1">${esc(p.text)}</span>
+        <button class="btn" onclick="copyPhrase(${i})">复制</button>
+        <button class="btn danger" onclick="delRec('phrases',${i})">删</button>
+      </div>`).join("")}
+    </div>`;
+}
+function addPhrase(){
+  const text = prompt("输入常用语（可用 ___ 占位）");
+  if(!text) return;
+  const category = prompt("分类（如：工资/资料/巡查/生产/清点，回车跳过）")||"通用";
+  DB.phrases.push({text, category}); save(); renderPhrases();
+}
+function copyPhrase(i){
+  navigator.clipboard.writeText(DB.phrases[i].text).then(()=>toast("已复制")).catch(()=>toast("复制失败，请手动选择"));
+}
+
+/* ================= 启动 ================= */
 window.addEventListener("hashchange", route);
 route();
 
