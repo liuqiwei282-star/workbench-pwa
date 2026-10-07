@@ -163,7 +163,8 @@ const defaultData = () => ({
   forestCoop: []        // 林地台账-合作林 {region,forest,county,village,farmer,mode,oldCode,newCode,area,year,manager...}
   ,
   contracts: [],        // 工序验收-合同库 {id,contractNo,areaName,farm,contractor,signDate,manager,siteOwner,note}
-  acceptanceRecords: [] // 工序验收记录 {id,contractNo,orderNo,plotCode,location,process,areaName,farm,signDate,applyDate,contractArea,actualArea,startPlan,startActual,endPlan,endActual,acceptApplyDate,forestDeadline,onsiteDate,manager,siteOwner,contractor,signCheck1..3,rStart,rEnd,rForest,rOnsite,qualityResult,opinion,photoType,createdAt,files:[]}
+  acceptanceRecords: [], // 工序验收记录 {id,contractNo,orderNo,plotCode,location,process,areaName,farm,signDate,applyDate,contractArea,actualArea,startPlan,startActual,endPlan,endActual,acceptApplyDate,forestDeadline,onsiteDate,manager,siteOwner,contractor,signCheck1..3,rStart,rEnd,rForest,rOnsite,qualityResult,opinion,photoType,createdAt,files:[]}
+  processes: []         // 用户自加作业工序 {n,c,r,s,a}
 });
 let DB = load();
 function load(){
@@ -818,6 +819,42 @@ function saveCloud(){
     .catch(()=>toast("网络错误：无法连接 GitHub"));
 }
 /* ================= 工序验收表（生成 xlsx/docx 到本地目录） ================= */
+/* 作业工序质量标准库（来源：太阳纸业控股老挝《抚育/造林作业各工序主要技术指标》） */
+const PROCESS_LIB = [
+ {n:"人工追肥",c:"抚育",r:"合格",s:"施肥坑规格：深×宽×长=20×20×20厘米，每项允许误差＜5厘米。施肥坑位置：第一次追肥距离植株30-40厘米，第二、三、四次施肥坑距离植株0.7-1米。施肥后回满坑。"},
+ {n:"机械追肥",c:"抚育",r:"合格",s:"第2、3、4次追肥使用拖拉机在种植行间开施肥沟，施肥沟深度＞15厘米，将肥料施放沟中并覆土，不让肥料外露。"},
+ {n:"带状铲草",c:"抚育",r:"合格",s:"将种植行两边各0.75米范围内的杂草、杂灌、藤类、竹丛等铲除干净。"},
+ {n:"带状铲草1",c:"抚育",r:"合格",s:"将种植行两边各0.75米范围内的杂草、杂灌、藤类、竹丛等铲除干净。",a:["带状锄草1"]},
+ {n:"带状铲草2",c:"抚育",r:"合格",s:"将种植行两边各0.75米范围内的杂草、杂灌、藤类、竹丛等铲除干净。",a:["带状锄草2","带装铲草2"]},
+ {n:"穴抚",c:"抚育",r:"合格",s:"将植株半径50厘米范围内杂草铲除干净。"},
+ {n:"带状砍草",c:"抚育",r:"合格",s:"将种植行两边各0.75米范围内的杂草、杂灌、藤类、竹丛全部砍断。竹丛、粽叶芦、地径大于8厘米的杂灌残茬高度＜50厘米，其它残茬高度＜30厘米。"},
+ {n:"全砍",c:"抚育",r:"合格",s:"将林地内的杂草、杂灌、藤类、竹丛全部砍倒。竹丛、粽叶芦、地径大于8厘米的杂灌残茬高度＜50厘米，其它残茬高度＜30厘米。"},
+ {n:"中耕除草",c:"抚育",r:"合格",s:"用拖拉机对距离种植行70厘米的行间土壤进行耕犁，平均深度≥10厘米以上，不得伤害林木。无法中耕的地段采用人工砍除。"},
+ {n:"化学除草",c:"抚育",r:"合格",s:"对作业范围内的杂草、杂灌、藤类、竹丛等喷施除草剂，喷施后1个月杂草杂灌、藤类、竹丛等死亡率达到90%以上，其中杂灌、竹丛、粽叶芦、芭蕉顶芽枯萎、叶片发黄即达到效果。作业过程中禁止药液喷洒到种植树种枝叶。除草剂公顷用量、配比按《喷除草剂作业技术标准》（第一次修订）执行。"},
+ {n:"林地喷药",c:"抚育",r:"合格",s:"根据林木受害情况，使用相对应的药品，配制成相应浓度的药液，均匀的喷洒在受害植株上。"},
+ {n:"根部施药",c:"抚育",r:"合格",s:"根据林木受害情况，在植株两侧挖坑施放相对应的药品。"},
+ {n:"捕捉害虫",c:"抚育",r:"合格",s:"对危害林木的害虫，采用人工或物理方式进行捕捉。"},
+ {n:"清理树盘",c:"抚育",r:"合格",s:"以林木为中心，半径0.5米为范围，将杂草和枯枝落叶清除干净，完成单独地块后进行焚烧。"},
+ {n:"开设防火带",c:"抚育",r:"合格",s:"采用人工或机械将林地周边10米范围内的杂草及枯枝落叶清除干净。"},
+ {n:"扶树",c:"抚育",r:"合格",s:"将倒伏林木扶正固定，培土压实。"},
+ {n:"修枝",c:"抚育",r:"合格",s:"将树高三分之一以下的枝条全部修除，残枝长度在5-10厘米，不得损伤主干树皮。"},
+ {n:"除萌",c:"抚育",r:"合格",s:"当优势萌芽条高度达到1.5至2米时，每个树桩保留正对方向最健壮的两株，其余的全部砍除，砍除高度<20厘米。不允许直接掰断多余萌芽条。是否进行第二次除萌根据林地保存率再定。"},
+ {n:"人工清山",c:"造林",r:"合格",s:"将林地内的杂草杂灌、杂木全面砍除。杂草、杂灌的留存高度≤30cm，杂木伐桩小于1米。炼山后整个小班全面清理，以不影响后续营林作业为合格。"},
+ {n:"机械清山",c:"造林",r:"合格",s:"用机械将林地的杂草、杂灌、杂木全面推倒，集中焚烧后摊开。"},
+ {n:"机筑平台",c:"造林",r:"合格",s:"沿山坡等高线挖平台，台面要求平整、宽度≥3.5米，坡度超过35度不挖平台。台面要求内低外高，内侧边坡≤70度的斜坡，外侧设50厘米高的土埂。平台间水平距离5米，允许±0.5米。"},
+ {n:"挖筑台田",c:"造林",r:"合格",s:"沿等高线开挖，将种植带间的表土堆放到种植带上。堆放厚度要求在50厘米以上，台面宽度5-6米，相对平整，堆土边坡不得超过50度。种植带之间的水平距离4-5米。沟内每隔20-30米留出1米宽的土埂，土埂不能高于台面，沟底相对平整。"},
+ {n:"机械全垦",c:"造林",r:"合格",s:"将林地内全面耕翻，翻垡方向一致平整，耕翻平均深≥20cm。"},
+ {n:"机械带垦",c:"造林",r:"合格",s:"用机械将种植带犁深≥20cm，宽150cm。行距宽为4米，允许误差在±5%。"},
+ {n:"机械裂土",c:"造林",r:"合格",s:"深≥50cm，行距宽为4米或按原种植行距，行距的误差允许在±5%。裂带呈水平布置，尽量减少水土流失。"},
+ {n:"机械松土",c:"造林",r:"合格",s:"沿等高线（或顺坡）开挖，用挖机挖深度为50厘米，宽度50厘米以上。"},
+ {n:"机械扶垄",c:"造林",r:"合格",s:"垄高25厘米以上，垄底宽度1.5米以上，垄面要求相对平整，不得间断。"},
+ {n:"人工挖坑",c:"造林",r:"合格",s:"株行距：裂土按原行距1.5米×4米或3.5×1.7米；平台和台田1.4米×2.5-3米；其他整地方式1.5米×4米或2米×3米，允许误差±10厘米。坑规格：坑口≥30cm×30cm，坑底≥25cm×25cm，深≥30cm，每项允许误差±5厘米。裂土或其它整地方式公顷标准坑数为1667个，即每公顷1583-1750个即为合格。"},
+ {n:"机械挖坑",c:"造林",r:"合格",s:"株行距：1.5米×4米或2米×3米，允许误差±20厘米。坑规格：50cm×50cm×50cm，允许误差±5厘米。公顷标准坑数为1667个，即每公顷1583-1750个即为合格。"},
+ {n:"施基肥回土",c:"造林",r:"合格",s:"将复合肥200克和钙镁磷300克施放到种植坑中。先将坑周边表土回至坑深度的三分之一，与基肥充分搅拌后，再继续回满坑，中心高出坑边沿3-5厘米呈包状。保水剂种植在5月份完成施基肥，施肥坑离植株主干30-40厘米，坑规格20×20×25厘米，肥料和土壤要搅拌。"},
+ {n:"栽植补植",c:"造林",r:"合格",s:"苗木种植要求直立于地面，种植时将苗木周围半径15cm内的土压紧，回土要高过苗木根茎5-8cm，栽植后7天开始进行补植，并在1个月内完成，7月31日前完成种植补植。栽植补植完成后3个月验收，保存率95%以上，平均树高大于50厘米为合格。常规整地公司每公顷供苗1800株；平台、台田公司每公顷供苗株数=每公顷实际坑数×110%。",a:["常规栽植补植"]},
+ {n:"保水剂栽植",c:"造林",r:"合格",s:"在栽植点挖30×30×30厘米坑，放入1-2升的保水剂。将苗木栽植在保水剂中间，苗根底部需与土壤接触，回土踩实，保持苗木直立。栽植补植完成后4个月验收，保存率95%以上，平均树高大于50厘米为合格。"}
+];
+function processLib(){ return PROCESS_LIB.concat(DB.processes||[]); }
 let accForm = { editId: null };
 function accDir(){ return (DB.settings && DB.settings.acceptanceDir) || "D:\\A太阳纸业\\1色本东林区-刘琪伟\\1工序验收\\验收表"; }
 function accF(v, def){ return (v===undefined||v===null||v==="") ? (def===undefined?"":def) : v; }
@@ -846,7 +883,12 @@ function renderAcceptance(){
         ${accI("acOrderNo","订单号","如 30","", f.orderNo)}
         ${accI("acLocation","林场及位置","如 班更阿活","", f.location)}
         ${accI("acPlot","年份林代码","如 S05-A5-19-26-G","", f.plotCode)}
-        ${accI("acProcess","作业工序","如 带状铲草2","", f.process)}
+        <div class="field"><label>作业工序（可选可手输）</label>
+          <input id="acProcess" list="acProcessList" placeholder="选择或输入，如 带状铲草2" value="${accF(f.process,"")}" oninput="accMatchProcess()" style="width:100%">
+          <datalist id="acProcessList">${processLib().map(p=>`<option value="${p.n}">${p.c}｜${p.s.slice(0,24)}…</option>`).join("")}</datalist>
+        </div>
+        ${accI("acQuality","质量标准（选工序后自动填入，可改）","标准文本","", f.qualityStd, "")}
+        ${accI("acQualityResult","验收结果","合格","", f.qualityResult, "合格")}
         ${accI("acAreaName","林区","","", f.areaName, "色奔东")}
         ${accI("acFarm","林场","如 班更","", f.farm)}
         ${accD("acSignDate","订单签订日期", f.signDate)}
@@ -960,13 +1002,24 @@ function collectAcceptance(){
     manager: g("acManager"), siteOwner: g("acSiteOwner"), contractor: g("acContractor"),
     signCheck1: g("acSignCheck"), signCheck2: g("acSignCheck"), signCheck3: g("acSignCheck"),
     rStart: g("acRStart"), rEnd: g("acREnd"), rForest: g("acRForest"), rOnsite: g("acROnsite"),
-    qualityResult: g("acQuality"), opinion: g("acOpinion"), photoType: g("acPhoto")
+    qualityStd: g("acQuality"),
+    qualityResult: (g("acQuality") ? g("acQuality") + " " : "") + g("acQualityResult"),
+    opinion: g("acOpinion"), photoType: g("acPhoto")
   };
+}
+function accMatchProcess(){
+  const v = document.getElementById("acProcess").value.trim();
+  const lib = processLib();
+  const hit = lib.find(p=>p.n===v) || lib.find(p=>(p.a||[]).includes(v));
+  if(hit){
+    document.getElementById("acQuality").value = hit.s;
+    document.getElementById("acQualityResult").value = hit.r || "合格";
+  }
 }
 async function genAcceptance(editId){
   const data = collectAcceptance();
-  if(!data.contractNo){ toast("请填写合同号"); return; }
-  if(!data.plotCode){ toast("请填写年份林代码"); return; }
+  if(!data.contractNo){ toast("请至少填写合同号（用于命名归档）"); return; }
+  const missing = ["orderNo","plotCode","process","onsiteDate","qualityResult"].filter(k=>!data[k]);
   const run = async ()=>{
     if(!(window.wbNative && window.wbNative.isNative)){ toast("生成表格需要在桌面软件版中操作（手机版只做记录）"); return; }
     toast("正在生成验收表…");
@@ -981,7 +1034,8 @@ async function genAcceptance(editId){
       toast("生成失败：" + (r.stderr ? r.stderr.replace(/\n/g," ").slice(0,60) : "请确认电脑已安装 Python"));
     }
   };
-  if(!editId && !accForm.editId && confirm("生成后会写入本地文件夹，并保存到验收记录。继续？")) await run();
+  const tip = missing.length ? ("以下字段未填，将留空或按“待补”生成，可生成后手动补充：\n" + missing.map(k=>({orderNo:"订单号",plotCode:"年份林代码",process:"作业工序",onsiteDate:"现场验收日期",qualityResult:"质量标准"})[k]).join("、") + "\n\n仍要生成吗？") : "生成后会写入本地文件夹，并保存到验收记录。继续？";
+  if(!editId && !accForm.editId && confirm(tip)) await run();
   else await run();
 }
 function renderSettings(){
