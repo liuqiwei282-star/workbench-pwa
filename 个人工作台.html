@@ -830,7 +830,7 @@ function mergeBuiltinCoop(){
   BUILTIN_MN_COOP.forEach(row=>{
     const key = row[7];
     if(key && !have.has(key)){
-      DB.forestCoop.push({region:row[0],forest:row[1],county:row[2],village:row[3],farmer:row[4],mode:row[5],oldCode:row[6],newCode:row[7],area:row[8],year:row[9],manager:row[10],mgrPhone:row[11],fieldMgr:row[12],fieldPhone:row[13],admin:row[14],adminPhone:"",note:row[15]});
+      DB.forestCoop.push({region:"色奔东林区",forest:row[1],county:row[2],village:row[3],farmer:row[4],mode:row[5],oldCode:row[6],newCode:row[7],area:row[8],year:row[9],manager:row[10],mgrPhone:row[11],fieldMgr:row[12],fieldPhone:row[13],admin:row[14],adminPhone:"",note:row[15]});
       have.add(key); add++;
     }
   });
@@ -2253,39 +2253,47 @@ function importMaterialExcel(input){
   input.value = "";
 }
 /* ================= 清点焚烧登记 ================= */
+let burnEdit = -1;
 function renderBurn(){
-  const list = DB.burnRecords.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
-  const pend = list.filter(x=>x.status!=="已焚烧").length;
+  const list = DB.burnRecords.map((r,di)=>({r,di})).sort((a,b)=>(b.r.date||"").localeCompare(a.r.date||""));
+  const pend = list.filter(x=>x.r.status!=="已焚烧").length;
+  const ed = burnEdit>=0 ? DB.burnRecords[burnEdit] : null;
+  const selOpt = (arr, cur) => arr.map(o=>`<option ${o===cur?"selected":""}>${o}</option>`).join("");
   view.innerHTML = `
     <div class="topbar"><h1>清点焚烧登记</h1></div>
     <div class="stats">
-      <div class="stat"><div class="label">登记记录</div><div class="num">${list.length}<small> 条</small></div></div>
+      <div class="stat"><div class="label">登记记录</div><div class="num">${DB.burnRecords.length}<small> 条</small></div></div>
       <div class="stat"><div class="label">待焚烧</div><div class="num" style="color:var(--orange)">${pend}</div></div>
-      <div class="stat"><div class="label">已焚烧</div><div class="num" style="color:var(--green)">${list.length-pend}</div></div>
+      <div class="stat"><div class="label">已焚烧</div><div class="num" style="color:var(--green)">${DB.burnRecords.length-pend}</div></div>
     </div>
     <div class="card">
-      <form onsubmit="addBurn(event)">
-        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
-        <div class="field"><label>地点</label><input name="place" required placeholder="如：班东仓库"></div>
-        <div class="field"><label>物品</label><select name="type"><option>肥料袋</option><option>除草剂瓶</option><option>肥料袋+除草剂瓶</option></select></div>
-        <div class="field"><label>数量</label><input type="number" name="count" required min="1" placeholder="袋/瓶数"></div>
-        <div class="field"><label>状态</label><select name="status"><option>已清点待焚烧</option><option>已焚烧</option></select></div>
-        <div class="field"><label>备注</label><input name="note" placeholder="可选"></div>
-        <div class="field" style="align-self:end"><button class="btn primary" type="submit">登记</button></div>
+      <form onsubmit="saveBurn(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${ed?esc(ed.date):todayStr()}" required></div>
+        <div class="field"><label>地点</label><input name="place" required placeholder="如：班东仓库" value="${ed?esc(ed.place):""}"></div>
+        <div class="field"><label>物品</label><select name="type">${selOpt(["肥料袋","除草剂瓶","肥料袋+除草剂瓶"], ed?ed.type:"肥料袋")}</select></div>
+        <div class="field"><label>数量</label><input type="number" name="count" required min="1" placeholder="袋/瓶数" value="${ed?ed.count:""}"></div>
+        <div class="field"><label>状态</label><select name="status">${selOpt(["已清点待焚烧","已焚烧"], ed?ed.status:"已清点待焚烧")}</select></div>
+        <div class="field"><label>备注</label><input name="note" placeholder="可选" value="${ed?esc(ed.note):""}"></div>
+        <div class="field" style="align-self:end">
+          <button class="btn primary" type="submit">${ed?"保存修改":"登记"}</button>
+          ${ed?`<button type="button" class="btn" onclick="burnEdit=-1;renderBurn()">取消</button>`:""}
+        </div>
       </form>
     </div>
     <div class="card">${matTable(["日期","地点","物品","数量","状态","备注","操作"],
-      list.map((x,i)=>`<tr>
-        <td>${esc(x.date)}</td><td>${esc(x.place)}</td><td>${esc(x.type)}</td><td>${x.count}</td>
-        <td style="color:${x.status==="已焚烧"?"var(--green)":"var(--orange)"}">${esc(x.status)}</td>
-        <td>${esc(x.note)}</td>
-        <td><button class="btn" onclick="burnDone(${i})">${x.status==="已焚烧"?"回退":"标焚烧"}</button> <button class="btn danger" onclick="delRec('burnRecords',${i})">删</button></td></tr>`))}
+      list.map(x=>`<tr>
+        <td>${esc(x.r.date)}</td><td>${esc(x.r.place)}</td><td>${esc(x.r.type)}</td><td>${x.r.count}</td>
+        <td style="color:${x.r.status==="已焚烧"?"var(--green)":"var(--orange)"}">${esc(x.r.status)}</td>
+        <td>${esc(x.r.note)}</td>
+        <td><button class="btn" onclick="burnDone(${x.di})">${x.r.status==="已焚烧"?"回退":"标焚烧"}</button> <button class="btn" onclick="burnEdit=${x.di};renderBurn()">改</button> <button class="btn danger" onclick="delRec('burnRecords',${x.di})">删</button></td></tr>`))}
     </div>`;
 }
-function addBurn(e){
+function saveBurn(e){
   e.preventDefault();
   const f = e.target;
-  DB.burnRecords.push({date:f.date.value, place:f.place.value.trim(), type:f.type.value, count:Number(f.count.value), status:f.status.value, note:f.note.value.trim()});
+  const rec = {date:f.date.value, place:f.place.value.trim(), type:f.type.value, count:Number(f.count.value), status:f.status.value, note:f.note.value.trim()};
+  if(burnEdit>=0 && DB.burnRecords[burnEdit]){ DB.burnRecords[burnEdit] = rec; burnEdit = -1; }
+  else { DB.burnRecords.push(rec); }
   save(); renderBurn();
 }
 function burnDone(i){
@@ -2992,6 +3000,14 @@ function copyPhrase(i){
 /* ================= 启动 ================= */
 window.addEventListener("hashchange", route);
 mergeBuiltinCoop();
+function fixMnRegion(){
+  if(Array.isArray(DB.forestCoop)){
+    let changed = false;
+    DB.forestCoop.forEach(r=>{ if(r.region==="孟农林场"){ r.region="色奔东林区"; changed=true; } });
+    if(changed) save(true);
+  }
+}
+fixMnRegion();
 route();
 
 </script>
