@@ -2546,46 +2546,87 @@ function renderForest(){
     }
   }
 }
-/* 林地统计图表：按 林场×年份×模式 聚合面积/地块数/种植户数 */
-let forestStats = {year:"", forest:""};
+/* 林地统计图表：合作林按 林场×年份×模式；自营林按 林场×进度；全部按 林场×来源 */
+let forestStats = {year:"", forest:"", scope:"coop"};
 const forestChartInst = {};
+const stripLao = s=>String(s||"").replace(/[\u0E80-\u0EFF]/g,"").trim();
 function renderForestStats(){
-  const all = DB.forestCoop || [];
-  const years = [...new Set(all.map(r=>r.year).filter(Boolean))].sort((a,b)=>String(b).localeCompare(String(a)));
-  const forests = [...new Set(all.map(r=>r.forest).filter(Boolean))].sort();
-  const src = all.filter(r=>{
-    if(forestStats.year && String(r.year||"")!==forestStats.year) return false;
-    if(forestStats.forest && r.forest!==forestStats.forest) return false;
-    return true;
-  });
-  const agg = {};
-  const stripLao = s=>String(s||"").replace(/[\u0E80-\u0EFF]/g,"").trim();
-  src.forEach(r=>{
-    const k = (r.forest||"未标")+"|"+(r.year||"")+"|"+(r.mode||"未标");
-    const a = agg[k] || (agg[k] = {forest:r.forest||"未标", year:r.year||"", mode:r.mode||"未标", count:0, area:0, farmers:new Set()});
-    a.count++; a.area += parseFloat(r.area)||0;
-    if(r.village && r.farmer) a.farmers.add(stripLao(r.village)+"|"+stripLao(r.farmer));
-  });
-  const rows = Object.values(agg).map(a=>({forest:a.forest, year:a.year, mode:a.mode, count:a.count, area:Math.round(a.area*100)/100, farmers:a.farmers.size}));
-  const xForests = [...new Set(rows.map(r=>r.forest))].sort();
-  const modes = [...new Set(rows.map(r=>r.mode))].sort();
-  const xKey = forestStats.year ? "forest" : "year";
-  const xLabels = xKey==="forest" ? xForests : [...new Set(rows.map(r=>r.year))].sort((a,b)=>String(a).localeCompare(String(b)));
-  const series = modes.map(m=>{
-    const map = {};
-    rows.filter(r=>r.mode===m).forEach(r=>{ map[r[xKey]] = (map[r[xKey]]||0) + r.area; });
-    return {name:m, type:"bar", stack:"a", data:xLabels.map(x=>Math.round((map[x]||0)*100)/100)};
-  });
-  const series2 = modes.map(m=>{
-    const map = {};
-    rows.filter(r=>r.mode===m).forEach(r=>{ map[r[xKey]] = (map[r[xKey]]||0) + r.count; });
-    return {name:m, type:"bar", stack:"b", data:xLabels.map(x=>map[x]||0)};
-  });
-  const series3 = modes.map(m=>{
-    const map = {};
-    rows.filter(r=>r.mode===m).forEach(r=>{ map[r[xKey]] = (map[r[xKey]]||0) + r.farmers; });
-    return {name:m, type:"bar", stack:"c", data:xLabels.map(x=>map[x]||0)};
-  });
+  const coop = DB.forestCoop || [], owned = DB.forestOwned || [];
+  const scope = forestStats.scope || "coop";
+  const years = [...new Set(coop.map(r=>r.year).filter(Boolean))].sort((a,b)=>String(b).localeCompare(String(a)));
+  const forestsAll = [...new Set([...coop, ...owned].map(r=>r.forest).filter(Boolean))].sort();
+  let rows = [], xLabels = [], legendArr = [], series = [], series2 = [], series3 = [], unit3 = "户", stat3 = "种植户数", hint = "", useYear = false, t1 = "", t3 = "", detailHead = "", detailBody = "";
+  if(scope==="coop"){
+    const src = coop.filter(r=>{
+      if(forestStats.year && String(r.year||"")!==forestStats.year) return false;
+      if(forestStats.forest && r.forest!==forestStats.forest) return false;
+      return true;
+    });
+    const agg = {};
+    src.forEach(r=>{
+      const k = (r.forest||"未标")+"|"+(r.year||"")+"|"+(r.mode||"未标");
+      const a = agg[k] || (agg[k] = {forest:r.forest||"未标", year:r.year||"", mode:r.mode||"未标", count:0, area:0, farmers:new Set()});
+      a.count++; a.area += parseFloat(r.area)||0;
+      if(r.village && r.farmer) a.farmers.add(stripLao(r.village)+"|"+stripLao(r.farmer));
+    });
+    rows = Object.values(agg).map(a=>({forest:a.forest, year:a.year, mode:a.mode, count:a.count, area:Math.round(a.area*100)/100, farmers:a.farmers.size}));
+    const xKey = forestStats.year ? "forest" : "year";
+    xLabels = forestStats.year ? [...new Set(rows.map(r=>r.forest))].sort() : [...new Set(rows.map(r=>r.year))].sort((a,b)=>String(a).localeCompare(String(b)));
+    legendArr = [...new Set(rows.map(r=>r.mode))].sort();
+    series = legendArr.map(m=>{const map={};rows.filter(r=>r.mode===m).forEach(r=>{map[r[xKey]]=(map[r[xKey]]||0)+r.area;});return {name:m,type:"bar",stack:"a",data:xLabels.map(x=>Math.round((map[x]||0)*100)/100)};});
+    series2 = legendArr.map(m=>{const map={};rows.filter(r=>r.mode===m).forEach(r=>{map[r[xKey]]=(map[r[xKey]]||0)+r.count;});return {name:m,type:"bar",stack:"b",data:xLabels.map(x=>map[x]||0)};});
+    series3 = legendArr.map(m=>{const map={};rows.filter(r=>r.mode===m).forEach(r=>{map[r[xKey]]=(map[r[xKey]]||0)+r.farmers;});return {name:m,type:"bar",stack:"c",data:xLabels.map(x=>map[x]||0)};});
+    unit3 = "户"; stat3 = "种植户数"; useYear = true;
+    hint = "选中某一年份时按林场对比；选\"全部年份\"时按年份对比";
+    t1 = "各林场/年份、各模式 种植面积（公顷）"; t3 = "种植户数（户）";
+    detailHead = "林场|年份|模式|地块数|面积(ha)|种植户(户)";
+    detailBody = rows.slice().sort((a,b)=>String(a.forest).localeCompare(String(b.forest),"zh")||String(a.year).localeCompare(String(b.year))).map(r=>`<tr><td>${esc(r.forest)}</td><td>${r.year}</td><td>${esc(r.mode)}</td><td>${r.count}</td><td>${r.area}</td><td>${r.farmers}</td></tr>`).join("");
+  } else if(scope==="owned"){
+    const src = owned.filter(r=>{ if(forestStats.forest && r.forest!==forestStats.forest) return false; return true; });
+    const agg = {};
+    src.forEach(r=>{
+      const k = (r.forest||"未标")+"|"+(r.progress||"未标进度");
+      const a = agg[k] || (agg[k] = {forest:r.forest||"未标", progress:r.progress||"未标进度", count:0, area:0, aA:0, aB:0, aC:0, aD:0});
+      a.count++; a.area += parseFloat(r.area)||0;
+      a.aA += parseFloat(r.areaA)||0; a.aB += parseFloat(r.areaB)||0; a.aC += parseFloat(r.areaC)||0; a.aD += parseFloat(r.areaD)||0;
+    });
+    rows = Object.values(agg).map(a=>({forest:a.forest, progress:a.progress, count:a.count, area:Math.round(a.area*100)/100, aA:Math.round(a.aA*100)/100, aB:Math.round(a.aB*100)/100, aC:Math.round(a.aC*100)/100, aD:Math.round(a.aD*100)/100}));
+    xLabels = [...new Set(rows.map(r=>r.forest))].sort();
+    const progs = [...new Set(rows.map(r=>r.progress))].sort();
+    series = progs.map(p=>{const map={};rows.filter(r=>r.progress===p).forEach(r=>{map[r.forest]=(map[r.forest]||0)+r.area;});return {name:p,type:"bar",stack:"a",data:xLabels.map(x=>Math.round((map[x]||0)*100)/100)};});
+    series2 = progs.map(p=>{const map={};rows.filter(r=>r.progress===p).forEach(r=>{map[r.forest]=(map[r.forest]||0)+r.count;});return {name:p,type:"bar",stack:"b",data:xLabels.map(x=>map[x]||0)};});
+    const cls = [["A类","aA"],["B类","aB"],["C类","aC"],["D类","aD"]];
+    legendArr = cls.map(c=>c[0]);
+    series3 = cls.map(c=>{const map={};rows.forEach(r=>{map[r.forest]=(map[r.forest]||0)+r[c[1]];});return {name:c[0],type:"bar",stack:"c",data:xLabels.map(x=>Math.round((map[x]||0)*100)/100)};});
+    unit3 = "公顷"; stat3 = "A/B/C/D类面积";
+    hint = "自营林无年份字段，按 林场×进度 统计；第三图展示 A/B/C/D 类面积";
+    t1 = "各林场、各进度 种植面积（公顷）"; t3 = "A/B/C/D 类面积（公顷）";
+    detailHead = "林场|进度|地块数|面积(ha)|A类|B类|C类|D类";
+    detailBody = rows.slice().sort((a,b)=>String(a.forest).localeCompare(String(b.forest),"zh")||String(a.progress).localeCompare(String(b.progress),"zh")).map(r=>`<tr><td>${esc(r.forest)}</td><td>${esc(r.progress)}</td><td>${r.count}</td><td>${r.area}</td><td>${r.aA}</td><td>${r.aB}</td><td>${r.aC}</td><td>${r.aD}</td></tr>`).join("");
+  } else {
+    const cf = coop.filter(r=>{ if(forestStats.forest && r.forest!==forestStats.forest) return false; return true; });
+    const of = owned.filter(r=>{ if(forestStats.forest && r.forest!==forestStats.forest) return false; return true; });
+    const agg = {};
+    cf.forEach(r=>{ const k=(r.forest||"未标")+"|合作林"; const a=agg[k]||(agg[k]={forest:r.forest||"未标",type:"合作林",count:0,area:0,farmers:new Set()}); a.count++; a.area+=parseFloat(r.area)||0; if(r.village&&r.farmer)a.farmers.add(stripLao(r.village)+"|"+stripLao(r.farmer)); });
+    of.forEach(r=>{ const k=(r.forest||"未标")+"|自营林"; const a=agg[k]||(agg[k]={forest:r.forest||"未标",type:"自营林",count:0,area:0,farmers:new Set()}); a.count++; a.area+=parseFloat(r.area)||0; });
+    rows = Object.values(agg).map(a=>({forest:a.forest,type:a.type,count:a.count,area:Math.round(a.area*100)/100,farmers:a.farmers.size}));
+    xLabels = [...new Set(rows.map(r=>r.forest))].sort();
+    legendArr = ["合作林","自营林"];
+    series = legendArr.map(t=>{const map={};rows.filter(r=>r.type===t).forEach(r=>{map[r.forest]=(map[r.forest]||0)+r.area;});return {name:t,type:"bar",stack:"a",data:xLabels.map(x=>Math.round((map[x]||0)*100)/100)};});
+    series2 = legendArr.map(t=>{const map={};rows.filter(r=>r.type===t).forEach(r=>{map[r.forest]=(map[r.forest]||0)+r.count;});return {name:t,type:"bar",stack:"b",data:xLabels.map(x=>map[x]||0)};});
+    series3 = [{name:"合作林",type:"bar",stack:"c",data:xLabels.map(x=>{let s=0;rows.filter(r=>r.type==="合作林").forEach(r=>{if(r.forest===x)s+=r.farmers;});return s;})}];
+    unit3 = "户"; stat3 = "种植户数(合作林)";
+    hint = "合并合作林与自营林，按 林场×来源 对比";
+    t1 = "合作林+自营林 面积对比（公顷）"; t3 = "种植户数（户，合作林）";
+    detailHead = "来源|林场|地块数|面积(ha)|种植户(户)";
+    detailBody = rows.slice().sort((a,b)=>String(a.type).localeCompare(String(b.type),"zh")||String(a.forest).localeCompare(String(b.forest),"zh")).map(r=>`<tr><td>${esc(r.type)}</td><td>${esc(r.forest)}</td><td>${r.count}</td><td>${r.area}</td><td>${r.farmers}</td></tr>`).join("");
+  }
+  const totArea = rows.reduce((s,r)=>s+r.area,0), totCount = rows.reduce((s,r)=>s+r.count,0), totFarmers = rows.reduce((s,r)=>s+(r.farmers||0),0);
+  const scopeSel = `<select onchange="forestStats.scope=this.value;forestStats.year='';forestStats.forest='';renderForestStats()" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+    <option value="coop" ${scope==="coop"?"selected":""}>合作林</option>
+    <option value="owned" ${scope==="owned"?"selected":""}>自营林</option>
+    <option value="all" ${scope==="all"?"selected":""}>全部（合作+自营）</option></select>`;
+  const headCols = detailHead.split("|");
   view.innerHTML = `
     <div class="topbar"><h1>林地台账</h1>
       <div class="btns">
@@ -2596,45 +2637,45 @@ function renderForestStats(){
         <input type="file" id="forestFile" accept=".xlsx,.xls" style="display:none" onchange="importForestExcel(this)">
       </div></div>
     <div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <span style="font-size:13px;color:var(--sub)">统计口径：</span>
-      <select onchange="forestStats.year=this.value;renderForestStats()" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
-        <option value="">全部年份</option>${years.map(y=>`<option value="${esc(y)}" ${forestStats.year===y?"selected":""}>${esc(y)}</option>`).join("")}</select>
+      <span style="font-size:13px;color:var(--sub)">统计范围：</span>${scopeSel}
+      ${scope==="coop"&&years.length?`<select onchange="forestStats.year=this.value;renderForestStats()" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+        <option value="">全部年份</option>${years.map(y=>`<option value="${esc(y)}" ${forestStats.year===y?"selected":""}>${esc(y)}</option>`).join("")}</select>`:""}
       <select onchange="forestStats.forest=this.value;renderForestStats()" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
-        <option value="">全部林场</option>${forests.map(f=>`<option value="${esc(f)}" ${forestStats.forest===f?"selected":""}>${esc(f)}</option>`).join("")}</select>
-      <span style="font-size:12px;color:var(--sub)">选中某一年份时按林场对比；选"全部年份"时按年份对比</span>
-      <button class="btn" onclick="forestStats={year:'',forest:''};renderForestStats()">重置</button>
+        <option value="">全部林场</option>${forestsAll.map(f=>`<option value="${esc(f)}" ${forestStats.forest===f?"selected":""}>${esc(f)}</option>`).join("")}</select>
+      <span style="font-size:12px;color:var(--sub)">${hint}</span>
+      <button class="btn" onclick="forestStats={year:'',forest:'',scope:forestStats.scope};renderForestStats()">重置</button>
     </div>
     <div class="stats">
-      <div class="stat"><div class="label">统计地块数</div><div class="num">${rows.reduce((s,r)=>s+r.count,0)}<small> 块</small></div></div>
-      <div class="stat"><div class="label">统计面积</div><div class="num">${fmtKip(rows.reduce((s,r)=>s+r.area,0).toFixed(2))}<small> ha</small></div></div>
-      <div class="stat"><div class="label">种植户数</div><div class="num">${rows.reduce((s,r)=>s+r.farmers,0)}<small> 户</small></div></div>
+      <div class="stat"><div class="label">统计地块数</div><div class="num">${totCount}<small> 块</small></div></div>
+      <div class="stat"><div class="label">统计面积</div><div class="num">${fmtKip(totArea.toFixed(2))}<small> ha</small></div></div>
+      <div class="stat"><div class="label">${stat3}</div><div class="num">${unit3==="户"?totFarmers:fmtKip(totFarmers.toFixed(2))}<small> ${unit3}</small></div></div>
     </div>
-    <div class="card" style="margin-bottom:12px"><h3>各林场/年份、各模式 种植面积（公顷）<span class="meta">共 ${rows.length} 个组合</span></h3><div id="fChartArea" style="height:320px"></div></div>
+    <div class="card" style="margin-bottom:12px"><h3>${t1}<span class="meta">共 ${rows.length} 个组合</span></h3><div id="fChartArea" style="height:320px"></div></div>
     <div class="grid2">
       <div class="card"><h3>地块数量（块）</h3><div id="fChartCount" style="height:280px"></div></div>
-      <div class="card"><h3>种植户数（户）</h3><div id="fChartFarmers" style="height:280px"></div></div>
+      <div class="card"><h3>${t3}</h3><div id="fChartFarmers" style="height:280px"></div></div>
     </div>
     <div class="card"><h3>明细组合表</h3>
       <div style="overflow:auto;max-height:320px">
-      <table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col style="width:16%"><col style="width:10%"><col style="width:14%"><col style="width:18%"><col style="width:18%"><col style="width:14%"><col style="width:10%"></colgroup>
-        <thead><tr><th>林场</th><th>年份</th><th>模式</th><th>地块数</th><th>面积(ha)</th><th>种植户(户)</th><th></th></tr></thead>
-        <tbody>${rows.slice().sort((a,b)=>String(a.forest).localeCompare(String(b.forest),"zh")||String(a.year).localeCompare(String(b.year))).map(r=>`<tr><td>${esc(r.forest)}</td><td>${r.year}</td><td>${esc(r.mode)}</td><td>${r.count}</td><td>${r.area}</td><td>${r.farmers}</td><td></td></tr>`).join("")}</tbody></table></div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup>${headCols.map(()=>`<col>`).join("")}<col></colgroup>
+        <thead><tr>${headCols.map(h=>`<th>${h}</th>`).join("")}<th></th></tr></thead>
+        <tbody>${detailBody}</tbody></table></div>
     </div>`;
   setTimeout(()=>{
-    const base = (title) => ({
-      tooltip:{trigger:"axis"}, legend:{data:modes, top:0}, grid:{left:40,right:12,top:34,bottom:30},
+    const base = {
+      tooltip:{trigger:"axis"}, legend:{top:0}, grid:{left:40,right:12,top:34,bottom:30},
       xAxis:{type:"category", data:xLabels, axisLabel:{interval:0, rotate:xLabels.length>6?30:0}},
       yAxis:{type:"value"}, color:["#2563eb","#16a34a","#ea580c","#9333ea","#0891b2"]
-    });
+    };
     ["fChartArea","fChartCount","fChartFarmers"].forEach(id=>{ const inst = forestChartInst[id]; if(inst) inst.dispose(); });
-    const mk = (id, seriesArr, unit) => {
+    const mk = (id, sArr, unit) => {
       const inst = echarts.init(document.getElementById(id));
       forestChartInst[id] = inst;
-      inst.setOption(Object.assign(base(unit), {series:seriesArr, yAxis:{type:"value", name:unit}}));
+      inst.setOption(Object.assign(base, {series:sArr, yAxis:{type:"value", name:unit}}));
     };
     mk("fChartArea", series, "公顷");
     mk("fChartCount", series2, "块");
-    mk("fChartFarmers", series3, "户");
+    mk("fChartFarmers", series3, unit3);
   }, 30);
 }
 function forestOps(coll, i){
