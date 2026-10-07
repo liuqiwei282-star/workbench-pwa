@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人工作台</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle' fill='white'%3E台%3C/text%3E%3C/svg%3E">
+<script src="assets/xlsx.full.min.js"></script>
+<script src="assets/echarts.min.js"></script>
+<script src="assets/pptxgen.bundle.js"></script>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --line:#e8ebf0; --text:#1f2937; --sub:#6b7280;
+    --blue:#2563eb; --blue-soft:#eff6ff; --green:#16a34a; --orange:#ea580c; --red:#dc2626;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+  .layout{display:flex;min-height:100vh}
+
+  /* ===== 侧边栏 ===== */
+  .sidebar{width:200px;background:#fff;border-right:1px solid var(--line);padding:20px 0;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .logo{font-size:17px;font-weight:700;color:var(--blue);padding:0 20px 16px;display:flex;align-items:center;gap:8px}
+  .logo::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--blue)}
+  .nav-group{font-size:11px;color:#9ca3af;padding:14px 20px 6px;letter-spacing:1px}
+  .nav-item{display:flex;align-items:center;gap:8px;padding:9px 20px;cursor:pointer;color:#374151;font-size:14px;border-left:3px solid transparent}
+  .nav-item:hover{background:#f3f4f6}
+  .nav-item.active{background:var(--blue-soft);color:var(--blue);border-left-color:var(--blue);font-weight:600}
+
+  /* ===== 主区 ===== */
+  .main{flex:1;padding:24px 28px;max-width:1200px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+  .topbar h1{font-size:19px;font-weight:700}
+  .topbar .date{color:var(--sub);font-size:13px;font-weight:400;margin-left:8px}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;color:#374151}
+  .btn:hover{border-color:var(--blue);color:var(--blue)}
+  .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .btn.primary:hover{background:#1d4ed8}
+  .btn.danger:hover{border-color:var(--red);color:var(--red)}
+
+  /* ===== 卡片 ===== */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .stat .label{font-size:12px;color:var(--sub)}
+  .stat .num{font-size:26px;font-weight:700;margin-top:6px}
+  .stat .num small{font-size:13px;font-weight:400;color:var(--sub)}
+  .stat .hint{font-size:11px;color:#9ca3af;margin-top:4px}
+
+  .grid2{display:grid;grid-template-columns:1fr 1.6fr;gap:14px;margin-bottom:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .card h3{font-size:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+  .card h3 .meta{font-size:12px;color:#9ca3af;font-weight:400}
+  .kv{margin:6px 0;font-size:14px}
+  .kv b{display:inline-block;min-width:56px;color:var(--sub);font-weight:400}
+
+  .progress-track{height:8px;background:#eef0f3;border-radius:4px;overflow:hidden;margin:10px 0 12px}
+  .progress-bar{height:100%;background:var(--green);border-radius:4px;transition:width .3s}
+  .task-line{font-size:13px;color:#4b5563;margin:4px 0}
+  .task-line.done{color:#9ca3af;text-decoration:line-through}
+  .task-line .tag{font-size:11px;color:var(--orange);margin-left:6px}
+
+  /* ===== 表格 ===== */
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  th{font-size:12px;color:var(--sub);font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px;border-bottom:1px solid #f0f2f5;font-size:13px}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px}
+  .pill.ok{background:#dcfce7;color:#15803d}
+  .pill.wait{background:#fef3c7;color:#b45309}
+  .pill.amt{background:#ffedd5;color:#c2410c}
+
+  /* ===== 表单 ===== */
+  form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+  .field label{display:block;font-size:12px;color:var(--sub);margin-bottom:4px}
+  .field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:#fff}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue)}
+  .field.full{grid-column:1/-1}
+  .empty{color:#9ca3af;text-align:center;padding:30px 0;font-size:13px}
+
+  /* 地点多选 */
+  .loc-pick{display:flex;flex-wrap:wrap;gap:8px}
+  .loc-pick label{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:16px;padding:5px 12px;font-size:13px;color:#374151;cursor:pointer;background:#fff}
+  .loc-pick input{display:none}
+  .loc-pick label.on{background:var(--blue-soft);border-color:var(--blue);color:var(--blue);font-weight:600}
+
+  /* 汇报文案框 */
+  .report-box{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:18px;font-size:14px;line-height:1.9;white-space:pre-wrap;font-family:Consolas,monospace}
+
+  /* ===== Toast ===== */
+  #toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
+  #toast.show{opacity:.92}
+
+  /* ===== 响应式 ===== */
+  @media (max-width:900px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .grid2{grid-template-columns:1fr}
+    .layout{flex-direction:column}
+    .sidebar{width:100%;height:auto;position:static;display:flex;overflow-x:auto;padding:8px}
+    .logo{padding:8px 12px}
+    .nav-group{display:none}
+    .nav-item{border-left:none;border-bottom:3px solid transparent;white-space:nowrap;padding:8px 12px}
+    .nav-item.active{border-bottom-color:var(--blue)}
+    .main{padding:16px}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">个人工作台</div>
+    <nav id="nav"></nav>
+  </aside>
+  <main class="main" id="view"></main>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ================= 数据层（存本机 localStorage） ================= */
+const KEY = "qingjian_workbench_v1";
+const defaultData = () => ({
+  workRecords: [],   // {date, content, location, done}
+  weathers: [],      // {date, morning, afternoon, low, high}
+  mileages: [],      // {date, km}
+  subsidies: [],     // {date, type, amount, note}
+  weeklyTasks: []    // {text, done, note}
+});
+let DB = load();
+function load(){
+  try{ const raw = localStorage.getItem(KEY); if(raw) return Object.assign(defaultData(), JSON.parse(raw)); }catch(e){}
+  return defaultData();
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._tm); t._tm = setTimeout(()=>t.classList.remove("show"), 1800);
+}
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function monthStr(){ return todayStr().slice(0,7); }
+function esc(s){ return String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ================= 导航配置 ================= */
+const NAV = [
+  {group:"快捷"},
+  {hash:"#/home",   icon:"◈", label:"首页"},
+  {hash:"#/report", icon:"✉", label:"每日汇报发微信"},
+  {group:"记录"},
+  {hash:"#/work",   icon:"☰", label:"每日工作记录"},
+  {hash:"#/weather",icon:"☂", label:"天气记录"},
+  {hash:"#/mileage",icon:"◎", label:"摩托车里程"},
+  {group:"计划"},
+  {hash:"#/plan",   icon:"▤", label:"本周工作计划"},
+  {group:"生活"},
+  {hash:"#/subsidy",icon:"¥", label:"就餐与补贴"},
+  {group:"总结"},
+  {hash:"#/summary-month", icon:"▦", label:"月度总结"},
+  {hash:"#/summary-year",  icon:"★", label:"年度总结"},
+  {group:"数据"},
+  {hash:"#/backup", icon:"⇪", label:"导出与导入"},
+];
+function renderNav(){
+  document.getElementById("nav").innerHTML = NAV.map(n=>{
+    if(n.group) return `<div class="nav-group">${n.group}</div>`;
+    const active = location.hash === n.hash ? "active" : "";
+    return `<div class="nav-item ${active}" onclick="location.hash='${n.hash}'"><span>${n.icon}</span>${n.label}</div>`;
+  }).join("");
+}
+
+/* ================= 统计计算 ================= */
+function monthItems(arr){ const m = monthStr(); return arr.filter(x=>x.date && x.date.startsWith(m)); }
+// 里程表是累计读数：总里程=最新读数；当月里程=本月最新读数-本月开始前最近一次读数
+function totalKm(){
+  const ms = DB.mileages.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  return ms.length ? Number(ms[ms.length-1].km) : 0;
+}
+function monthKm(ym){
+  const ms = DB.mileages.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const inMonth = ms.filter(x=>x.date.startsWith(ym));
+  if(!inMonth.length) return 0;
+  const lastKm = Number(inMonth[inMonth.length-1].km);
+  const before = ms.filter(x=>x.date < ym+"-01");
+  const base = before.length ? Number(before[before.length-1].km) : Number(inMonth[0].km);
+  return lastKm - base;
+}
+function streakDays(){
+  // 从今天往前数，连续有工作记录的天数
+  let count = 0; const d = new Date();
+  const dates = new Set(DB.workRecords.map(x=>x.date));
+  for(let i=0;i<365;i++){
+    const ds = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    if(dates.has(ds)) count++; else if(i>0) break;
+    d.setDate(d.getDate()-1);
+  }
+  return count;
+}
+function weekRange(){
+  const now = new Date(); const day = now.getDay()||7;
+  const mon = new Date(now); mon.setDate(now.getDate()-day+1);
+  const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+  const f = d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  return {mon:f(mon), sun:f(sun)};
+}
+
+/* ================= 各视图渲染 ================= */
+const view = document.getElementById("view");
+
+function renderHome(){
+  const mr = monthItems(DB.workRecords);
+  const doneCnt = mr.filter(x=>x.done).length;
+  const rate = mr.length ? Math.round(doneCnt/mr.length*100) : 0;
+  const kmTotal = totalKm();
+  const kmMonth = monthKm(monthStr());
+  const sub = monthItems(DB.subsidies).reduce((s,x)=>s+Number(x.amount||0),0);
+  const st = streakDays();
+  const t = todayStr();
+  const todayWork = DB.workRecords.filter(x=>x.date===t);
+  const todayWx = DB.weathers.find(x=>x.date===t);
+
+  // 最近7天
+  let rows = "";
+  for(let i=6;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const ds = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    const wd = ["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];
+    const w = DB.weathers.find(x=>x.date===ds);
+    const cnt = DB.workRecords.filter(x=>x.date===ds);
+    const doneN = cnt.filter(x=>x.done).length;
+    const s = DB.subsidies.filter(x=>x.date===ds).reduce((a,b)=>a+Number(b.amount||0),0);
+    const hl = ds===t ? 'style="background:#fff7ed"' : "";
+    rows += `<tr ${hl}>
+      <td style="width:18%">${Number(ds.slice(5,7))}/${Number(ds.slice(8,10))} ${wd}</td>
+      <td style="width:32%">${w?`上${w.morning} 下${w.afternoon} ${w.low}~${w.high}℃`:"—"}</td>
+      <td style="width:32%">${cnt.length?`${cnt.length} 条 / 完成 ${doneN}`:"—"}</td>
+      <td style="width:18%">${s?`<span class="pill amt">¥${s}</span>`:"—"}</td>
+    </tr>`;
+  }
+
+  // 本周任务
+  const wt = DB.weeklyTasks;
+  const wtDone = wt.filter(x=>x.done).length;
+  const pct = wt.length ? Math.round(wtDone/wt.length*100) : 0;
+  const tasksHtml = wt.map((x,i)=>`
+    <div class="task-line ${x.done?'done':''}">${x.done?"[完成]":"[待办]"} ${esc(x.text)}${x.note?`<span class="tag">${esc(x.note)}</span>`:""}</div>
+  `).join("") || `<div class="empty">还没有本周计划，去「本周工作计划」添加</div>`;
+
+  view.innerHTML = `
+    <div class="topbar">
+      <h1>首页<span class="date">今天 ${Number(t.slice(5,7))}月${Number(t.slice(8,10))}日 ${["周日","周一","周二","周三","周四","周五","周六"][new Date().getDay()]}</span></h1>
+      <div class="btns">
+        <button class="btn primary" onclick="location.hash='#/work'">＋ 记一条</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="label">本月工作记录</div><div class="num">${mr.length}<small> 条</small></div><div class="hint">已完成 ${doneCnt} 条</div></div>
+      <div class="stat"><div class="label">本月任务完成率</div><div class="num">${rate}<small>%</small></div><div class="hint">${mr.length} 条记录</div></div>
+      <div class="stat"><div class="label">摩托车总里程</div><div class="num">${kmTotal.toFixed(1)}<small> km</small></div><div class="hint">里程表累计读数</div></div>
+      <div class="stat"><div class="label">本月行驶里程</div><div class="num">${kmMonth.toFixed(1)}<small> km</small></div><div class="hint">较上月末新增</div></div>
+      <div class="stat"><div class="label">本月生活补贴</div><div class="num">¥${sub}</div><div class="hint">${monthItems(DB.subsidies).length} 条登记</div></div>
+      <div class="stat"><div class="label">连续记录</div><div class="num">${st}<small> 天</small></div><div class="hint">保持住</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>今日状态<span class="meta">${t}</span></h3>
+        <div class="kv"><b>天气：</b>${todayWx?`上午${todayWx.morning} ${todayWx.low}~${todayWx.high}℃`:"未记录"}</div>
+        <div class="kv"><b>工作：</b>${todayWork.length?`已记录 ${todayWork.length} 条`:"<span style='color:var(--red)'>未记录</span>"}</div>
+        <div class="kv"><b>补贴：</b>${(DB.subsidies.filter(x=>x.date===t).reduce((a,b)=>a+Number(b.amount||0),0))>0?`¥${DB.subsidies.filter(x=>x.date===t).reduce((a,b)=>a+Number(b.amount||0),0)}`:"未登记"}</div>
+      </div>
+      <div class="card">
+        <h3>本周计划进度<span class="meta">${weekRange().mon} ~ ${weekRange().sun}　${wtDone}/${wt.length} 项完成</span></h3>
+        <div style="font-size:13px;color:#4b5563">已完成 <b style="color:var(--green)">${wtDone}</b>　进行中 <b style="color:var(--blue)">${wt.length-wtDone}</b>　整体完成 <b style="color:var(--blue)">${pct}%</b></div>
+        <div class="progress-track"><div class="progress-bar" style="width:${pct}%"></div></div>
+        ${tasksHtml}
+      </div>
+    </div>
+    <div class="card">
+      <h3>最近 7 天<span class="meta">天气 / 工作 / 补贴</span></h3>
+      <table>
+        <colgroup><col style="width:18%"><col style="width:32%"><col style="width:32%"><col style="width:18%"></colgroup>
+        <tr><th>日期</th><th>天气</th><th>工作记录</th><th>当日补贴</th></tr>
+        ${rows}
+      </table>
+    </div>`;
+}
+
+/* ================= 工作记录 ================= */
+function renderWork(){
+  const list = DB.workRecords.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  view.innerHTML = `
+    <div class="topbar"><h1>每日工作记录</h1></div>
+    <div class="card">
+      <form onsubmit="addWork(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
+        <div class="field full"><label>工作地点（点选常用，也可手动补充）</label>
+          <div class="loc-pick" id="locPick">
+            ${["班东","色奔","中心苗圃","孟农","公司"].map(l=>`<label><input type="checkbox" name="loc" value="${l}">${l}</label>`).join("")}
+          </div>
+          <input name="locOther" placeholder="其他地点（多个用顿号分隔，选填）" style="margin-top:8px">
+        </div>
+        <div class="field full"><label>工作内容</label><textarea name="content" rows="2" placeholder="今天做了什么？" required></textarea></div>
+        <div class="field"><label>状态</label><select name="done"><option value="1">已完成</option><option value="0">进行中</option></select></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">保存记录</button></div>
+      </form>
+      <table>
+        <colgroup><col style="width:13%"><col style="width:22%"><col style="width:45%"><col style="width:12%"><col style="width:8%"></colgroup>
+        <tr><th>日期</th><th>工作地点</th><th>工作内容</th><th>状态</th><th></th></tr>
+        ${list.map((x,i)=>`<tr>
+          <td>${x.date}</td><td>${(x.locations||[x.location]).join("、")||"—"}</td><td>${esc(x.content)}</td>
+          <td>${x.done?'<span class="pill ok">完成</span>':'<span class="pill wait">进行中</span>'}</td>
+          <td><button class="btn danger" onclick="delRec('workRecords',${DB.workRecords.indexOf(x)})">删</button></td>
+        </tr>`).join("") || '<tr><td colspan="5" class="empty">还没有记录</td></tr>'}
+      </table>
+    </div>`;
+  // 多选样式切换
+  document.querySelectorAll("#locPick label").forEach(lb=>{
+    lb.addEventListener("click", e=>{ e.preventDefault(); const cb=lb.querySelector("input"); cb.checked=!cb.checked; lb.classList.toggle("on", cb.checked); });
+  });
+}
+function addWork(e){
+  e.preventDefault();
+  const f = e.target;
+  const locs = [...f.querySelectorAll("input[name=loc]:checked")].map(c=>c.value);
+  (f.locOther.value||"").split(/[、,，\s]+/).forEach(s=>{ if(s) locs.push(s); });
+  DB.workRecords.push({date:f.date.value, content:f.content.value, locations:locs, done:f.done.value==="1"});
+  save(); toast("已保存"); renderWork(); renderNav();
+}
+
+/* ================= 天气 ================= */
+function renderWeather(){
+  const list = DB.weathers.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const opts = ["晴","多云","阴","小雨","中雨","大雨","雷雨前","雾"];
+  const loc = DB.settings && DB.settings.geo ? DB.settings.geo : "";
+  view.innerHTML = `
+    <div class="topbar">
+      <h1>天气记录</h1>
+      <div class="btns">
+        <button class="btn" onclick="autoGeo()">📍 获取我的位置</button>
+        <button class="btn primary" onclick="fetchWeather()">🌦 一键获取今日天气</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:13px;color:var(--sub)">
+        常用坐标（第一次点「获取我的位置」自动保存；也可手动填）：
+        <input type="number" step="0.0001" id="geoLat" placeholder="纬度" style="width:110px;padding:5px;border:1px solid var(--line);border-radius:6px;margin:0 6px" value="${loc.lat||""}">
+        <input type="number" step="0.0001" id="geoLng" placeholder="经度" style="width:110px;padding:5px;border:1px solid var(--line);border-radius:6px" value="${loc.lng||""}">
+        <button class="btn" onclick="saveGeo()">保存</button>
+      </div>
+    </div>
+    <div class="card">
+      <form onsubmit="addWeather(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
+        <div class="field"><label>上午天气</label><select name="morning">${opts.map(o=>`<option>${o}</option>`).join("")}</select></div>
+        <div class="field"><label>下午天气</label><select name="afternoon">${opts.map(o=>`<option>${o}</option>`).join("")}</select></div>
+        <div class="field"><label>最低温 ℃</label><input type="number" name="low" value="24"></div>
+        <div class="field"><label>最高温 ℃</label><input type="number" name="high" value="36"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">保存</button></div>
+      </form>
+      <table>
+        <colgroup><col style="width:22%"><col style="width:26%"><col style="width:26%"><col style="width:18%"><col style="width:8%"></colgroup>
+        <tr><th>日期</th><th>上午</th><th>下午</th><th>温度</th><th></th></tr>
+        ${list.map(x=>`<tr><td>${x.date}</td><td>${x.morning}</td><td>${x.afternoon}</td><td>${x.low}~${x.high}℃</td>
+          <td><button class="btn danger" onclick="delRec('weathers',${DB.weathers.indexOf(x)})">删</button></td></tr>`).join("") || '<tr><td colspan="5" class="empty">还没有记录</td></tr>'}
+      </table>
+    </div>`;
+}
+function addWeather(e){
+  e.preventDefault(); const f = e.target;
+  const i = DB.weathers.findIndex(x=>x.date===f.date.value);
+  const rec = {date:f.date.value, morning:f.morning.value, afternoon:f.afternoon.value, low:f.low.value, high:f.high.value};
+  if(i>=0) DB.weathers[i]=rec; else DB.weathers.push(rec);
+  save(); toast(i>=0?"已更新当天天气":"已保存"); renderWeather();
+}
+
+/* ================= 里程 ================= */
+function renderMileage(){
+  const list = DB.mileages.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  view.innerHTML = `
+    <div class="topbar"><h1>摩托车里程</h1></div>
+    <div class="stats" style="margin-bottom:14px">
+      <div class="stat"><div class="label">累计总里程</div><div class="num">${totalKm().toFixed(1)}<small> km</small></div></div>
+      <div class="stat"><div class="label">本月行驶</div><div class="num">${monthKm(monthStr()).toFixed(1)}<small> km</small></div></div>
+    </div>
+    <div class="card">
+      <form onsubmit="addMileage(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
+        <div class="field"><label>当前里程表读数 (km)</label><input type="number" step="0.1" name="km" required placeholder="如 19163.0"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">保存</button></div>
+      </form>
+      <table>
+        <colgroup><col style="width:25%"><col style="width:35%"><col style="width:32%"><col style="width:8%"></colgroup>
+        <tr><th>日期</th><th>里程表读数</th><th>较上一次新增</th><th></th></tr>
+        ${list.map((x,i)=>{
+          const later = DB.mileages.filter(m=>m.date>x.date).sort((a,b)=>a.date.localeCompare(b.date))[0];
+          const diff = later ? (later.km - x.km).toFixed(1) : "—";
+          return `<tr><td>${x.date}</td><td>${Number(x.km).toFixed(1)} km</td><td>${diff}</td>
+            <td><button class="btn danger" onclick="delRec('mileages',${DB.mileages.indexOf(x)})">删</button></td></tr>`;
+        }).join("") || '<tr><td colspan="4" class="empty">还没有记录</td></tr>'}
+      </table>
+    </div>`;
+}
+function addMileage(e){
+  e.preventDefault(); const f = e.target;
+  DB.mileages.push({date:f.date.value, km:Number(f.km.value)});
+  save(); toast("已保存"); renderMileage();
+}
+
+/* ================= 补贴 ================= */
+function renderSubsidy(){
+  const list = DB.subsidies.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  view.innerHTML = `
+    <div class="topbar"><h1>就餐与补贴</h1></div>
+    <div class="card">
+      <form onsubmit="addSubsidy(event)">
+        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
+        <div class="field"><label>类型</label><select name="type"><option>生活补贴</option><option>就餐</option><option>厂区</option><option>其他</option></select></div>
+        <div class="field"><label>金额 (元)</label><input type="number" step="0.01" name="amount" required></div>
+        <div class="field"><label>备注</label><input name="note" placeholder="选填"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">保存</button></div>
+      </form>
+      <table>
+        <colgroup><col style="width:18%"><col style="width:18%"><col style="width:15%"><col style="width:41%"><col style="width:8%"></colgroup>
+        <tr><th>日期</th><th>类型</th><th>金额</th><th>备注</th><th></th></tr>
+        ${list.map(x=>`<tr><td>${x.date}</td><td>${x.type}</td><td><span class="pill amt">¥${x.amount}</span></td><td>${esc(x.note||"")}</td>
+          <td><button class="btn danger" onclick="delRec('subsidies',${DB.subsidies.indexOf(x)})">删</button></td></tr>`).join("") || '<tr><td colspan="5" class="empty">还没有记录</td></tr>'}
+      </table>
+    </div>`;
+}
+function addSubsidy(e){
+  e.preventDefault(); const f = e.target;
+  DB.subsidies.push({date:f.date.value, type:f.type.value, amount:Number(f.amount.value), note:f.note.value});
+  save(); toast("已保存"); renderSubsidy();
+}
+
+/* ================= 周计划 ================= */
+function renderPlan(){
+  const wt = DB.weeklyTasks;
+  view.innerHTML = `
+    <div class="topbar"><h1>本周工作计划</h1></div>
+    <div class="card">
+      <form onsubmit="addTask(event)">
+        <div class="field full"><label>新任务</label><input name="text" placeholder="本周要做什么？" required></div>
+        <div class="field"><label>备注（交付时间等）</label><input name="note" placeholder="选填，如 交付 10/5"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">添加</button></div>
+      </form>
+      ${wt.map((x,i)=>`
+        <div class="task-line ${x.done?'done':''}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f2f5">
+          <span><input type="checkbox" ${x.done?"checked":""} onchange="toggleTask(${i})">　${esc(x.text)}${x.note?`<span class="tag">${esc(x.note)}</span>`:""}</span>
+          <button class="btn danger" onclick="delTask(${i})">删</button>
+        </div>`).join("") || '<div class="empty">本周还没有计划</div>'}
+    </div>`;
+}
+function addTask(e){ e.preventDefault(); const f=e.target; DB.weeklyTasks.push({text:f.text.value, note:f.note.value, done:false}); save(); toast("已添加"); renderPlan(); }
+function toggleTask(i){ DB.weeklyTasks[i].done=!DB.weeklyTasks[i].done; save(); renderPlan(); }
+function delTask(i){ if(confirm("删除这条任务？")){ DB.weeklyTasks.splice(i,1); save(); renderPlan(); } }
+
+/* ================= 备份 ================= */
+function renderBackup(){
+  view.innerHTML = `
+    <div class="topbar"><h1>导出与导入备份</h1></div>
+    <div class="card" style="max-width:680px;margin-bottom:14px">
+      <h3>月度工作日志（Excel）</h3>
+      <div class="kv" style="font-size:13px;color:var(--sub)">按你原来 Excel 的格式生成：三列并排，每天含日期/地点/里程/工作内容。</div>
+      <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:10px">
+        <div class="field" style="margin:0"><label>选择月份</label><input type="month" id="expMonth" value="${monthStr()}"></div>
+        <button class="btn primary" onclick="exportMonthExcel()">导出当月 Excel</button>
+      </div>
+    </div>
+    <div class="card" style="max-width:640px">
+      <div class="kv">所有数据都存在本机浏览器里，换电脑或清理浏览器前请先导出备份。</div>
+      <div class="btns" style="margin:16px 0">
+        <button class="btn" onclick="exportData()">导出数据备份 (JSON)</button>
+        <button class="btn" onclick="document.getElementById('importFile').click()">导入备份</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        <button class="btn" onclick="fillDemo()">填充示例数据</button>
+        <button class="btn danger" onclick="clearAll()">清空全部数据</button>
+      </div>
+    </div>`;
+}
+function exportMonthExcel(){
+  if(typeof XLSX === "undefined"){ alert("Excel 组件未加载，请确认 assets 文件夹和本页面在同一目录"); return; }
+  const ym = document.getElementById("expMonth").value;
+  if(!ym){ alert("请先选择月份"); return; }
+  const [y,m] = ym.split("-").map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const aoa = [];
+  aoa.push(["考核部外勤工作日志"]);
+  aoa.push([`姓名：刘琪伟`, `区域/岗位名称：合作部考核员`, `上级直接主管：杜国平`]);
+  for(let d=1; d<=daysInMonth; d++){
+    const col = (d-1) % 3;
+    const rowBase = 2 + Math.floor((d-1)/3)*4;
+    const ds = `${ym}-${String(d).padStart(2,"0")}`;
+    const works = DB.workRecords.filter(x=>x.date===ds);
+    const locSet = new Set(); works.forEach(x=>(x.locations||[]).forEach(l=>locSet.add(l)));
+    const wx = DB.weathers.find(x=>x.date===ds);
+    const mile = DB.mileages.filter(x=>x.date===ds).sort((a,b)=>b.km-a.km)[0];
+    while(aoa.length < rowBase+4) aoa.push([]);
+    aoa[rowBase][col] = `日期:${y} 年 ${m}月${d}日`;
+    let locTxt = [...locSet].join("、");
+    if(wx){
+      let wxTxt = wx.morning;
+      if(wx.afternoon && wx.afternoon!==wx.morning) wxTxt += `转${wx.afternoon}`;
+      locTxt += (locTxt?"（":"（") + wxTxt + "）";
+    }
+    aoa[rowBase+1][col] = `工作地点：${locTxt}`;
+    aoa[rowBase+2][col] = `车辆里程：${mile?Number(mile.km).toFixed(0):""}`;
+    let content = "主要工作内容：";
+    works.forEach((w,i)=>{ content += `\n${i+1}、${w.content}`; });
+    aoa[rowBase+3][col] = content;
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:2}}];
+  ws["!cols"] = [{wch:28},{wch:28},{wch:28}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `${y}年${m}月`);
+  XLSX.writeFile(wb, `刘琪伟${y}年${m}月工作日志.xlsx`);
+  toast("已导出 Excel");
+}
+function exportData(){
+  const blob = new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "工作台备份-"+todayStr()+".json";
+  a.click(); toast("已导出");
+}
+function importData(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{ try{ DB = Object.assign(defaultData(), JSON.parse(r.result)); save(); toast("导入成功"); route(); }catch(err){ alert("文件格式不对"); } };
+  r.readAsText(f);
+}
+function clearAll(){ if(confirm("确定清空全部数据？此操作不可恢复！")){ localStorage.removeItem(KEY); DB=defaultData(); toast("已清空"); route(); } }
+function fillDemo(){
+  const t = todayStr();
+  DB.workRecords = [
+    {date:t, content:"安全培训", location:"考核部办公室", done:true},
+    {date:t, content:"无人机设备录入准备", location:"祖晃林场", done:false},
+  ];
+  DB.weathers = [{date:t, morning:"晴", afternoon:"晴", low:24, high:36}];
+  DB.mileages = [{date:t, km:19163.0}];
+  DB.subsidies = [{date:t, type:"生活补贴", amount:40, note:"3天就餐记录"}];
+  DB.weeklyTasks = [{text:"无人机设备录入", note:"交付 10/5", done:true},{text:"面积核对及上传系统", note:"交付 10/31", done:false}];
+  save(); toast("已填充示例数据"); route();
+}
+
+/* ================= 每日汇报（发微信） ================= */
+function buildReport(dateStr){
+  const works = DB.workRecords.filter(x=>x.date===dateStr);
+  const locSet = new Set(); works.forEach(x=>(x.locations||[]).forEach(l=>locSet.add(l)));
+  const locs = [...locSet].join("、");
+  const wx = DB.weathers.find(x=>x.date===dateStr);
+  const weatherTxt = wx ? `${wx.morning}转${wx.afternoon}` : "";
+  const mile = DB.mileages.filter(x=>x.date===dateStr).sort((a,b)=>b.km-a.km)[0];
+  const d = new Date(dateStr+"T00:00:00");
+  const dateTxt = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+  let lines = [];
+  lines.push(`日期：${dateTxt}`);
+  lines.push(`工作地点：${locs||"—"}${weatherTxt?`（${weatherTxt}）`:""}`);
+  lines.push(`车辆里程：${mile?Number(mile.km).toFixed(0):"—"}`);
+  lines.push(`主要工作内容：`);
+  works.forEach((w,i)=>{ lines.push(`${i+1}、${w.content}`); });
+  return lines.join("\n");
+}
+function renderReport(){
+  const old = document.getElementById("repDate");
+  const t = (old && old.value) ? old.value : todayStr();
+  view.innerHTML = `
+    <div class="topbar"><h1>每日汇报发微信</h1></div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+        <div class="field" style="margin:0"><label>选择日期</label><input type="date" id="repDate" value="${t}" onchange="renderReport()"></div>
+        <button class="btn primary" onclick="downloadReportImg()">下载表格图片</button>
+        <button class="btn" onclick="copyReport()">复制纯文本</button>
+        <button class="btn" style="background:#07c160;color:#fff;border-color:#07c160" onclick="sendToWechat()">发送到微信</button>
+      </div>
+      <div style="font-size:12px;color:var(--sub);margin-top:10px">
+        第一次用：去 <b>sct.ftqq.com</b> 微信扫码登录，复制你的 SendKey，填到下面。
+        <input type="text" id="sendKey" placeholder="粘贴 Server酱 SendKey（SCT...）" value="${(DB.settings&&DB.settings.sendkey)||''}" style="margin-top:6px;width:100%;padding:6px 10px;border:1px solid var(--line);border-radius:6px">
+        <button class="btn" style="margin-top:6px" onclick="saveSendKey()">保存 SendKey</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>表格预览<span class="meta">${t} · 下载后直接发微信</span></h3>
+      <canvas id="reportCanvas" style="width:100%;border-radius:8px"></canvas>
+      <div class="report-box" style="margin-top:14px" id="reportBox">${esc(buildReport(t))}</div>
+    </div>`;
+  drawReportImage(t);
+}
+
+/* 把汇报内容画成表格图片 */
+function drawReportImage(dateStr){
+  const c = document.getElementById("reportCanvas");
+  const dpr = 2; // 高清
+  const W = 750;
+  // 先算内容
+  const works = DB.workRecords.filter(x=>x.date===dateStr);
+  const locSet = new Set(); works.forEach(x=>(x.locations||[]).forEach(l=>locSet.add(l)));
+  const locs = [...locSet].join("、");
+  const wx = DB.weathers.find(x=>x.date===dateStr);
+  const d = new Date(dateStr+"T00:00:00");
+  const dateTxt = `${d.getFullYear()} 年 ${d.getMonth()+1}月${d.getDate()}日`;
+  const mile = DB.mileages.filter(x=>x.date===dateStr).sort((a,b)=>b.km-a.km)[0];
+  const rows = [
+    ["日期", dateTxt],
+    ["工作地点", locs+(wx?`（${wx.morning}${wx.afternoon&&wx.afternoon!==wx.morning?"转"+wx.afternoon:""}）`:"")],
+    ["车辆里程", mile?Number(mile.km).toFixed(0)+" km":"—"],
+    ["主要工作内容", works.map((w,i)=>`${i+1}、${w.content}`).join("\n")]
+  ];
+  // 计算高度
+  const labelW = 130, pad = 18, lineH = 34;
+  const fontSize = 18;
+  let H = 60; // 顶部留白
+  const ctx = c.getContext("2d");
+  ctx.font = `${fontSize}px "Microsoft YaHei", sans-serif`;
+  const rowHeights = rows.map(([label,text])=>{
+    const maxW = W - labelW - pad*2;
+    // 按换行+宽度折行
+    const lines = [];
+    String(text).split("\n").forEach(seg=>{
+      let cur = "";
+      for(const ch of seg){
+        if(ctx.measureText(cur+ch).width > maxW){ lines.push(cur); cur = ch; }
+        else cur += ch;
+      }
+      lines.push(cur);
+    });
+    return Math.max(lineH, lines.length*lineH);
+  });
+  H += rowHeights.reduce((a,b)=>a+b,0) + 40;
+  c.width = W*dpr; c.height = H*dpr;
+  c.style.height = H+"px";
+  ctx.scale(dpr,dpr);
+  ctx.font = `${fontSize}px "Microsoft YaHei", sans-serif`;
+  // 背景
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = "#333"; ctx.lineWidth = 1.5;
+  // 标题线外框
+  ctx.strokeRect(10, 10, W-20, H-20);
+  let y = 10;
+  rows.forEach(([label,text],i)=>{
+    const rh = rowHeights[i];
+    // 标签列
+    ctx.fillStyle = "#f3f4f6"; ctx.fillRect(10, y, labelW, rh);
+    ctx.strokeStyle = "#333";
+    // 横线
+    ctx.beginPath(); ctx.moveTo(10,y+rh); ctx.lineTo(W-10,y+rh); ctx.stroke();
+    // 竖线（标签列右边）
+    ctx.beginPath(); ctx.moveTo(10+labelW,y); ctx.lineTo(10+labelW,y+rh); ctx.stroke();
+    // 标签文字
+    ctx.fillStyle = "#1f2937"; ctx.font = `bold ${fontSize}px "Microsoft YaHei", sans-serif`;
+    ctx.fillText(label, 20, y+fontSize+10);
+    // 内容文字（多行）
+    ctx.font = `${fontSize}px "Microsoft YaHei", sans-serif`;
+    ctx.fillStyle = "#1f2937";
+    const maxW = W - labelW - pad*2 - 10;
+    let cy = y + fontSize + 10;
+    String(text).split("\n").forEach(seg=>{
+      let cur="";
+      for(const ch of seg){
+        if(ctx.measureText(cur+ch).width > maxW){ ctx.fillText(cur, 10+labelW+pad, cy); cy += lineH; cur = ch; }
+        else cur += ch;
+      }
+      ctx.fillText(cur, 10+labelW+pad, cy); cy += lineH;
+    });
+    y += rh;
+  });
+}
+function downloadReportImg(){
+  const c = document.getElementById("reportCanvas");
+  const a = document.createElement("a");
+  a.href = c.toDataURL("image/png");
+  a.download = `工作日报-${document.getElementById("repDate").value}.png`;
+  a.click();
+  toast("图片已下载，去微信发图片");
+}
+function copyReport(){
+  const txt = document.getElementById("reportBox").innerText;
+  navigator.clipboard.writeText(txt).then(()=>toast("已复制，去微信粘贴发送")).catch(()=>{
+    const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); toast("已复制");
+  });
+}
+function saveSendKey(){
+  const k = document.getElementById("sendKey").value.trim();
+  DB.settings = DB.settings || {}; DB.settings.sendkey = k; save();
+  toast(k?"SendKey 已保存":"已清空 SendKey");
+}
+async function sendToWechat(){
+  const key = (DB.settings && DB.settings.sendkey) || document.getElementById("sendKey").value.trim();
+  if(!key){ alert("请先填入 Server酱 SendKey 并保存"); return; }
+  const dateStr = document.getElementById("repDate").value;
+  const txt = buildReport(dateStr);
+  let imgUrl = "";
+  // 1. 上传表格图（失败不阻断文字推送）
+  try{
+    toast("正在上传表格图…");
+    const c = document.getElementById("reportCanvas");
+    const blob = await new Promise(r=>c.toBlob(r,"image/png"));
+    const fd = new FormData();
+    fd.append("reqtype","fileupload");
+    fd.append("fileToUpload", blob, "report.png");
+    const up = await fetch("https://catbox.moe/user/api.php", {method:"POST", body:fd});
+    const upText = await up.text();
+    if(up.ok && upText.startsWith("http")) imgUrl = upText.trim();
+  }catch(e){ console.warn("图床上传失败，跳过图片", e); }
+  // 2. Server酱推送
+  try{
+    toast("正在发送到微信…");
+    const desp = txt + (imgUrl ? `\n\n---\n\n![工作日报](${imgUrl})` : "");
+    const r = await fetch(`https://sctapi.ftqq.com/${key}.send`, {
+      method:"POST",
+      headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:`title=${encodeURIComponent(`工作日报 ${dateStr}`)}&desp=${encodeURIComponent(desp)}`
+    });
+    const j = await r.json();
+    if(j.code===0) toast(imgUrl ? "已发送（带表格图）" : "已发送（文字版，图上传失败）");
+    else alert("发送失败："+(j.message||JSON.stringify(j)));
+  }catch(e){ alert("发送失败（需要联网）："+e.message); }
+}
+
+/* ================= 月度 / 年度总结 ================= */
+let chartInst = null;
+function renderSummary(scope){
+  const isMonth = scope==="month";
+  const cur = isMonth ? monthStr() : todayStr().slice(0,4);
+  view.innerHTML = `
+    <div class="topbar">
+      <h1>${isMonth?"月度总结":"年度总结"}</h1>
+      <div class="btns">
+        <input type="${isMonth?"month":"number"}" id="sumPeriod" value="${cur}" ${isMonth?"":"min='2020' max='2030'"}>
+        <button class="btn" onclick="renderSummary('${scope}')">查看</button>
+        <button class="btn primary" onclick="exportPPT('${scope}')">导出 PPT</button>
+      </div>
+    </div>
+    <div id="sumContent"></div>`;
+  drawSummary(scope);
+}
+function periodData(scope){
+  const v = document.getElementById("sumPeriod").value;
+  const works = scope==="month" ? DB.workRecords.filter(x=>x.date.startsWith(v))
+                                : DB.workRecords.filter(x=>x.date.startsWith(v));
+  return {v, works,
+    weathers: (scope==="month"?DB.weathers:DB.weathers).filter(x=>x.date.startsWith(v)),
+    miles: DB.mileages.filter(x=>x.date.startsWith(v)),
+    subs: DB.subsidies.filter(x=>x.date.startsWith(v))};
+}
+function drawSummary(scope){
+  const {v, works, weathers, miles, subs} = periodData(scope);
+  const doneN = works.filter(x=>x.done).length;
+  const subTotal = subs.reduce((s,x)=>s+Number(x.amount||0),0);
+  const days = new Set(works.map(x=>x.date)).size;
+  // 周期行驶里程 = 本周期最后读数 - 上一周期最后读数
+  const allMiles = DB.mileages.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  let km = "0";
+  if(allMiles.length){
+    const inPeriod = allMiles.filter(x=>x.date.startsWith(v));
+    if(inPeriod.length){
+      const lastKm = Number(inPeriod[inPeriod.length-1].km);
+      const before = allMiles.filter(x=>x.date < v+"-01");
+      const base = before.length ? Number(before[before.length-1].km) : Number(inPeriod[0].km);
+      km = (lastKm - base).toFixed(1);
+    }
+  }
+
+  // 工作内容汇总
+  const workList = works.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>
+    `<tr><td>${x.date}</td><td>${(x.locations||[]).join("、")}</td><td>${esc(x.content)}</td>
+     <td>${x.done?'<span class="pill ok">完成</span>':'<span class="pill wait">进行中</span>'}</td></tr>`).join("");
+
+  document.getElementById("sumContent").innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="label">工作记录</div><div class="num">${works.length}<small> 条</small></div><div class="hint">${days} 个工作日</div></div>
+      <div class="stat"><div class="label">完成率</div><div class="num">${works.length?Math.round(doneN/works.length*100):0}<small>%</small></div><div class="hint">${doneN} 条已完成</div></div>
+      <div class="stat"><div class="label">行驶里程</div><div class="num">${km}<small> km</small></div><div class="hint">${miles.length} 次记录</div></div>
+      <div class="stat"><div class="label">补贴合计</div><div class="num">¥${subTotal}</div><div class="hint">${subs.length} 条登记</div></div>
+    </div>
+    <div class="card" style="margin-bottom:14px"><div id="mainChart" style="width:100%;height:320px"></div></div>
+    <div class="card">
+      <h3>完成的工作明细<span class="meta">${works.length} 条</span></h3>
+      <table>
+        <colgroup><col style="width:15%"><col style="width:25%"><col style="width:48%"><col style="width:12%"></colgroup>
+        <tr><th>日期</th><th>地点</th><th>工作内容</th><th>状态</th></tr>
+        ${workList || '<tr><td colspan="4" class="empty">这个周期还没有记录</td></tr>'}
+      </table>
+    </div>`;
+
+  // ECharts
+  if(typeof echarts === "undefined"){ document.getElementById("mainChart").innerHTML = "<div class='empty'>图表组件未加载</div>"; return; }
+  if(chartInst){ try{chartInst.dispose()}catch(e){} }
+  chartInst = echarts.init(document.getElementById("mainChart"));
+  let categories=[], seriesWorks=[], seriesKm=[];
+  if(scope==="month"){
+    const daysInMonth = new Date(Number(v.slice(0,4)), Number(v.slice(5,7)), 0).getDate();
+    for(let d=1; d<=daysInMonth; d++){
+      const ds = `${v}-${String(d).padStart(2,"0")}`;
+      categories.push(d+"日");
+      seriesWorks.push(works.filter(x=>x.date===ds).length);
+      const mk = miles.filter(x=>x.date===ds).sort((a,b)=>b.km-a.km)[0];
+      seriesKm.push(mk?Number(mk.km):null);
+    }
+  } else {
+    for(let m=1; m<=12; m++){
+      const prefix = `${v}-${String(m).padStart(2,"0")}`;
+      categories.push(m+"月");
+      seriesWorks.push(works.filter(x=>x.date.startsWith(prefix)).length);
+      const ms = miles.filter(x=>x.date.startsWith(prefix)).sort((a,b)=>a.date.localeCompare(b.date));
+      seriesKm.push(ms.length?Number(ms[ms.length-1].km):null);
+    }
+  }
+  chartInst.setOption({
+    tooltip:{trigger:"axis"},
+    legend:{data:["工作记录数","里程表读数(km)"]},
+    grid:{left:50,right:50,top:40,bottom:30},
+    xAxis:{type:"category",data:categories},
+    yAxis:[{type:"value",name:"条"},{type:"value",name:"km"}],
+    series:[
+      {name:"工作记录数",type:"bar",data:seriesWorks,itemStyle:{color:"#2563eb"}},
+      {name:"里程表读数(km)",type:"line",yAxisIndex:1,data:seriesKm,itemStyle:{color:"#16a34a"},connectNulls:true}
+    ]
+  });
+}
+async function exportPPT(scope){
+  if(typeof PptxGenJS === "undefined"){ alert("PPT 组件未加载，请确认 assets 文件夹完整"); return; }
+  const {v, works, subs} = periodData(scope);
+  const doneN = works.filter(x=>x.done).length;
+  const ppt = new PptxGenJS();
+  ppt.defineLayout({name:"W",width:13.33,height:7.5}); ppt.layout="W";
+  // 封面
+  const s1 = ppt.addSlide();
+  s1.background={color:"FFFFFF"};
+  s1.addText(`刘琪伟 ${v} 工作总结`, {x:0.5,y:2.5,w:12.3,h:1.5,fontSize:40,bold:true,color:"1F2937",align:"center"});
+  s1.addText(`考核部外勤 | 合作部考核员`, {x:0.5,y:4.2,w:12.3,h:0.6,fontSize:18,color:"6B7280",align:"center"});
+  // 数据概览
+  const s2 = ppt.addSlide();
+  s2.addText("数据概览", {x:0.5,y:0.4,w:12,h:0.8,fontSize:28,bold:true,color:"1F2937"});
+  s2.addText([
+    {text:`工作记录：${works.length} 条\n`,options:{fontSize:20,color:"2563eb",bold:true}},
+    {text:`完成：${doneN} 条（${works.length?Math.round(doneN/works.length*100):0}%）\n\n`,options:{fontSize:16}},
+    {text:`补贴合计：¥${subs.reduce((a,b)=>a+Number(b.amount||0),0)}\n`,options:{fontSize:20,color:"16A34A",bold:true}},
+  ], {x:0.8,y:1.5,w:11,h:2.5});
+  // 工作明细（最多列 30 条）
+  const lines = works.slice(0,30).map(x=>`${x.date}  ${(x.locations||[]).join("、")}  ${x.content}`);
+  const s3 = ppt.addSlide();
+  s3.addText("主要工作内容", {x:0.5,y:0.4,w:12,h:0.8,fontSize:28,bold:true,color:"1F2937"});
+  s3.addText(lines.join("\n") || "（无记录）", {x:0.8,y:1.4,w:11.7,h:5.5,fontSize:14,color:"374151",breakLine:false});
+  await ppt.writeFile({fileName:`刘琪伟${v}工作总结.pptx`});
+  toast("PPT 已导出");
+}
+
+/* ================= 自动获取天气（Open-Meteo） ================= */
+function saveGeo(){
+  const lat = parseFloat(document.getElementById("geoLat").value);
+  const lng = parseFloat(document.getElementById("geoLng").value);
+  if(isNaN(lat)||isNaN(lng)){ alert("请输入有效的经纬度"); return; }
+  DB.settings = DB.settings || {}; DB.settings.geo = {lat, lng}; save();
+  toast("已保存常用坐标");
+}
+function autoGeo(){
+  if(!navigator.geolocation){ alert("当前浏览器不支持定位"); return; }
+  toast("正在定位…");
+  navigator.geolocation.getCurrentPosition(pos=>{
+    document.getElementById("geoLat").value = pos.coords.latitude.toFixed(4);
+    document.getElementById("geoLng").value = pos.coords.longitude.toFixed(4);
+    saveGeo();
+  }, ()=>alert("定位失败，请手动输入经纬度"));
+}
+function wmo2txt(code){
+  if(code===0) return "晴";
+  if(code<=2) return "晴"; if(code===3) return "多云";
+  if(code===45||code===48) return "雾";
+  if(code>=51&&code<=67) return "小雨";
+  if(code>=61&&code<=67) return "中雨";
+  if(code>=80&&code<=82) return "大雨";
+  if(code>=95) return "雷雨前";
+  return "多云";
+}
+async function fetchWeather(){
+  const g = DB.settings && DB.settings.geo;
+  if(!g){ alert("请先点「获取我的位置」或手动填入经纬度并保存"); return; }
+  try{
+    toast("正在获取天气…");
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${g.lat}&longitude=${g.lng}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FBangkok&forecast_days=1`;
+    const r = await fetch(url);
+    const j = await r.json();
+    const w = j.daily;
+    const cond = wmo2txt(w.weathercode[0]);
+    document.querySelector('select[name=morning]').value = cond;
+    document.querySelector('select[name=afternoon]').value = cond;
+    document.querySelector('input[name=low]').value = w.temperature_2m_min[0].toFixed(0);
+    document.querySelector('input[name=high]').value = w.temperature_2m_max[0].toFixed(0);
+    toast(`已获取：${cond} ${w.temperature_2m_min[0].toFixed(0)}~${w.temperature_2m_max[0].toFixed(0)}℃，确认后点保存`);
+  }catch(e){ alert("获取失败（需要联网）："+e.message); }
+}
+
+/* ================= 通用删除 & 路由 ================= */
+function delRec(coll, i){ if(confirm("删除这条记录？")){ DB[coll].splice(i,1); save(); route(); } }
+function route(){
+  renderNav();
+  const h = location.hash || "#/home";
+  if(h==="#/work") renderWork();
+  else if(h==="#/report") renderReport();
+  else if(h==="#/weather") renderWeather();
+  else if(h==="#/mileage") renderMileage();
+  else if(h==="#/subsidy") renderSubsidy();
+  else if(h==="#/summary-month") renderSummary("month");
+  else if(h==="#/summary-year") renderSummary("year");
+  else if(h==="#/plan") renderPlan();
+  else if(h==="#/backup") renderBackup();
+  else renderHome();
+}
+window.addEventListener("hashchange", route);
+route();
+
+</script>
+</body>
+</html>
