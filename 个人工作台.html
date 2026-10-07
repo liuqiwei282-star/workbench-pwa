@@ -163,6 +163,7 @@ const defaultData = () => ({
   forestCoop: []        // 林地台账-合作林 {region,forest,county,village,farmer,mode,oldCode,newCode,area,year,manager...}
   ,
   contracts: [],        // 工序验收-合同库 {id,contractNo,areaName,farm,contractor,signDate,manager,siteOwner,note}
+  contractDetails: [],  // 合同明细 [合同号,标段订单号,林场,林班,代码,工序,面积,单价,开完工时间]
   acceptanceRecords: [], // 工序验收记录 {id,contractNo,orderNo,plotCode,location,process,areaName,farm,signDate,applyDate,contractArea,actualArea,startPlan,startActual,endPlan,endActual,acceptApplyDate,forestDeadline,onsiteDate,manager,siteOwner,contractor,signCheck1..3,rStart,rEnd,rForest,rOnsite,qualityResult,opinion,photoType,createdAt,files:[]}
   processes: []         // 用户自加作业工序 {n,c,r,s,a}
 });
@@ -819,6 +820,172 @@ function saveCloud(){
     .catch(()=>toast("网络错误：无法连接 GitHub"));
 }
 /* ================= 工序验收表（生成 xlsx/docx 到本地目录） ================= */
+/* 内置合同库（12份合同，来源：2合同 文件夹 PDF） */
+const BUILTIN_CONTRACTS = [
+ {contractNo:"LWBD-WGC-20251228",contractor:"王国春",areaName:"色奔东",kind:"抚育",signDate:"",note:"L260096 合同"},
+ {contractNo:"LWBD-LCY-20251228",contractor:"刘成阳",areaName:"色奔东",kind:"抚育",signDate:"",note:"L260097 合同"},
+ {contractNo:"LWBD-LUN-20251228",contractor:"阿伦",areaName:"色奔东",kind:"抚育",signDate:"",note:"L260158 合同"},
+ {contractNo:"LWSB-LUN-20260622",contractor:"轮",areaName:"色奔东",kind:"抚育",signDate:"",note:"L260977 合同"},
+ {contractNo:"LWSBD-LCY-20260622",contractor:"刘成阳",areaName:"色奔东",kind:"抚育",signDate:"",note:"L260980 合同"},
+ {contractNo:"LWSBD-SM-20260622",contractor:"沙麦",areaName:"色奔东",kind:"抚育",signDate:"",note:"L260981 合同"},
+ {contractNo:"LWSBD-LYX-20260622",contractor:"罗应祥",areaName:"色奔东",kind:"抚育",signDate:"",note:"罗应祥合同明细（带状砍草19项）"},
+ {contractNo:"LWBG-WGC-20260411",contractor:"王国春",areaName:"色奔东",kind:"抚育",signDate:"",note:"LWBG 合同"},
+ {contractNo:"LWBK-LCY-20260411",contractor:"刘成阳",areaName:"色奔东",kind:"抚育",signDate:"",note:"LWBK 合同"},
+ {contractNo:"LWBK-LUN-20260411",contractor:"轮",areaName:"色奔东",kind:"抚育",signDate:"",note:"LWBK 合同"},
+ {contractNo:"LWMJ-LYX-20260306",contractor:"罗应祥",areaName:"色奔东",kind:"抚育",signDate:"",note:"LWMJ 合同"},
+ {contractNo:"TYLWZL2025077",contractor:"李家安",areaName:"色奔东",kind:"采运",signDate:"2025-01",note:"林木采运作业发包合同"}
+];
+/* 内置合同明细库 [合同号,标段订单号,林场,林班,代码,工序,面积,单价,开完工时间]（来源：各合同《发包明细》） */
+const BUILTIN_DETAILS = [
+["LWBD-WGC-20251228","1","班更","阿多","S04-D1-21-26-G","人工挖坑",66.78,83,"2026.3-2026.5"],
+["LWBD-WGC-20251228","2","班更","阿多","S04-D1-21-26-G","施基肥回土",66.78,105,"2026.3-2026.5"],
+["LWBD-WGC-20251228","3","班更","阿多","S04-D1-21-26-G","保水剂栽植",20,120,"2026.3-2026.5"],
+["LWBD-WGC-20251228","4","班更","阿多","S04-D1-21-26-G","栽植补植",46.78,80,"2026.4-2026.7"],
+["LWBD-WGC-20251228","5","班更","阿多","S04-D1-21-26-G","带状铲草1",66.78,85,"2026.4-2026.7"],
+["LWBD-WGC-20251228","6","班更","阿多","S04-D1-21-26-G","带状铲草2",66.78,85,"2026.8-2026.9"],
+["LWBD-WGC-20251228","7","班更","阿来","S04-B0-11-24-M","全砍",44.5,83,"2026.5-2026.11"],
+["LWBD-WGC-20251228","8","班更","阿来","S04-B0-11-24-G","全砍",10.52,83,"2026.5-2026.11"],
+["LWBD-WGC-20251228","9","班更","阿来","S04-B0-12-24-M","全砍",0.83,83,"2026.5-2026.11"],
+["LWBD-WGC-20251228","10","班更","阿来","S04-B0-11-26-M","全砍",32.63,83,"2026.5-2026.11"],
+["LWBD-WGC-20251228","11","班更","阿来","S04-B0-11-26-M","全砍",50.65,83,"2026.5-2026.11"],
+["LWBD-WGC-20251228","12","班更","阿来","S04-B0-12-26-M","全砍",40.03,83,"2026.5-2026.11"],
+["LWBD-WGC-20251228","13","班更","阿来","S04-B0-12-26-M","全砍",95.19,83,"2026.5-2026.11"],
+["LWBD-WGC-20251228","14","班更","阿来","S04-B0-11-24-M","人工追肥",44.5,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","15","班更","阿来","S04-B0-11-24-G","人工追肥",10.52,88,"2026.8-2026.10"],
+["LWBD-WGC-20251228","16","班更","阿来","S04-B0-12-24-M","人工追肥",0.83,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","17","班更","恒鲁安","S04-C7-15-23-M","人工追肥",33.53,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","18","班更","恒鲁安","S04-C7-17-23-M","人工追肥",10.18,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","19","班更","阿多","S04-D1-16-23-M","人工追肥",12.49,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","20","班更","阿多","S04-D1-23-23-X","人工追肥",9.33,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","21","班更","阿多","S04-D1-19-24-M","人工追肥",5.05,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","22","班更","阿多","S04-D1-21-26-G","人工追肥",66.78,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","23","班更","阿来","S04-B0-11-26-M","人工追肥",50.65,110,"2026.1-2026.6"],
+["LWBD-WGC-20251228","24","班更","阿来","S04-B0-12-26-M","人工追肥",95.19,110,"2026.1-2026.6"],
+["LWBD-WGC-20251228","25","班更","帕龙","S05-A6-19-26-G","保水剂栽植",5,150,"2026.3-2026.5"],
+["LWBD-WGC-20251228","26","班更","阿活","S05-A5-19-26-G","保水剂栽植",5,150,"2026.3-2026.5"],
+["LWBD-WGC-20251228","27","班更","帕龙","S05-A6-19-26-G","带状铲草1",15,90,"2026.4-2026.7"],
+["LWBD-WGC-20251228","28","班更","阿活","S05-A5-19-26-G","带状铲草1",10,90,"2026.4-2026.7"],
+["LWBD-WGC-20251228","29","班更","帕龙","S05-A6-19-26-G","带状铲草2",15,90,"2026.8-2026.9"],
+["LWBD-WGC-20251228","30","班更","阿活","S05-A5-19-26-G","带状铲草2",10,90,"2026.8-2026.9"],
+["LWBD-WGC-20251228","31","班更","帕龙","S05-A6-19-26-G","人工挖坑",15,83,"2026.3-2026.5"],
+["LWBD-WGC-20251228","32","班更","阿活","S05-A5-19-26-G","人工挖坑",10,83,"2026.3-2026.5"],
+["LWBD-WGC-20251228","33","班更","帕龙","S05-A6-19-26-G","施基肥回土",15,100,"2026.3-2026.5"],
+["LWBD-WGC-20251228","34","班更","阿活","S05-A5-19-26-G","施基肥回土",10,100,"2026.3-2026.5"],
+["LWBD-WGC-20251228","35","班更","帕龙","S05-A6-19-26-G","栽植补植",10,80,"2026.4-2026.7"],
+["LWBD-WGC-20251228","36","班更","阿活","S05-A5-19-26-G","栽植补植",5,80,"2026.4-2026.7"],
+["LWBD-WGC-20251228","37","班更","帕龙","S05-A6-19-26-G","人工追肥",15,88,"2026.1-2026.6"],
+["LWBD-WGC-20251228","38","班更","帕龙","S05-A6-11-26-M","人工追肥",63.64,110,"2026.1-2026.6"],
+["LWBD-WGC-20251228","39","班更","帕龙","S05-A6-12-26-M","人工追肥",115.12,110,"2026.1-2026.6"],
+["LWBD-WGC-20251228","40","班更","帕龙","S05-A6-19-26-M","人工追肥",30.84,110,"2026.1-2026.6"],
+["LWBD-WGC-20251228","41","班更","阿活","S05-A5-11-26-M","人工追肥",79.68,110,"2026.1-2026.6"],
+["LWBD-WGC-20251228","42","班更","阿活","S05-A5-19-26-M","人工追肥",20.08,110,"2026.1-2026.6"],
+["LWBD-WGC-20251228","43","班更","阿活","S05-A5-19-26-G","人工追肥",10,85,"2026.1-2026.6"],
+["LWBD-WGC-20251228","44","班更","沙当","S05-A10-23-23-X","人工追肥",19.45,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","45","班更","沙当","S05-A10-16-24-M","人工追肥",5.96,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","46","班更","沙当","S05-A10-17-24-M","人工追肥",18.02,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","47","班更","拉加","S05-D2-23-23-X","人工追肥",47.9,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","48","班更","拉加","S05-D2-16-24-M","人工追肥",63.64,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","49","班更","拉加","S05-D2-17-24-M","人工追肥",128.33,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","50","班更","拉加","S05-D2-24-24-X","人工追肥",61.9,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","51","班昆","华南","S04-F4-23-23-X","化学除草",198.93,50,"2026.5-2026.11"],
+["LWBD-WGC-20251228","52","班昆","普勒","S04-F9-25-25-X","化学除草",20.7,50,"2026.5-2026.11"],
+["LWBD-WGC-20251228","53","班昆","普勒","S04-F9-24-24-X","化学除草",88.45,50,"2026.5-2026.11"],
+["LWBD-WGC-20251228","54","班昆","沙诺依","S04-E7-22-22-X","化学除草",122.63,50,"2026.5-2026.11"],
+["LWBD-WGC-20251228","55","班昆","沙诺依","S04-E7-21-21-X","化学除草",165.95,50,"2026.5-2026.11"],
+["LWBD-WGC-20251228","56","班昆","达烈","S04-F7-24-24-X","化学除草",52.5,50,"2026.5-2026.11"],
+["LWBD-WGC-20251228","57","班昆","华南","S04-F4-23-23-X","人工追肥",198.93,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","58","班昆","普勒","S04-F9-25-25-X","人工追肥",20.7,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","59","班昆","普勒","S04-F9-24-24-X","人工追肥",88.45,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","60","班昆","达烈","S04-F7-24-24-X","人工追肥",52.5,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","61","班昆","王帕","S04-G2-25-25-X","全砍",23.95,90,"2026.5-2026.11"],
+["LWBD-WGC-20251228","62","班昆","王恒","S04-F5-23-23-X","全砍",64.32,90,"2026.5-2026.11"],
+["LWBD-WGC-20251228","63","班昆","班蚌","S04-G1-25-25-X","全砍",53.04,90,"2026.5-2026.11"],
+["LWBD-WGC-20251228","64","班昆","更加龙","S04-C9-25-25-X","全砍",28.16,90,"2026.5-2026.11"],
+["LWBD-WGC-20251228","65","班昆","卡捏","S04-F6-24-24-X","全砍",44.23,90,"2026.5-2026.11"],
+["LWBD-WGC-20251228","66","班昆","王帕","S04-G2-25-25-X","机械追肥",50,25,"2026.1-2026.6"],
+["LWBD-WGC-20251228","67","班昆","王海","S04-F8-24-24-X","机械追肥",132.77,25,"2026.1-2026.6"],
+["LWBD-WGC-20251228","68","班昆","王恒","S04-F5-23-23-X","机械追肥",117.76,25,"2026.1-2026.6"],
+["LWBD-WGC-20251228","69","班昆","更加龙","S04-C9-25-25-X","机械追肥",44.04,25,"2026.1-2026.6"],
+["LWBD-WGC-20251228","70","班昆","王帕","S04-G2-25-25-X","人工追肥",23.95,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","71","班昆","王海","S04-F8-24-24-X","人工追肥",52.41,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","72","班昆","王恒","S04-F5-23-23-X","人工追肥",64.32,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","73","班昆","更加龙","S04-C9-25-25-X","人工追肥",44.12,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","74","班昆","卡捏","S04-F6-24-24-X","人工追肥",142.5,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","75","班昆","班蚌","S04-G1-25-25-X","人工追肥",83.04,90,"2026.1-2026.6"],
+["LWBD-WGC-20251228","76","班昆","香洪","S04-G3-25-26-X","人工清山",6,260,"2026.1-2026.2"],
+["LWBD-WGC-20251228","77","班昆","香洪","S04-G3-25-26-X","人工挖坑",46,90,"2026.2-2026.5"],
+["LWBD-WGC-20251228","78","班昆","班昆","S04-C3-22-26-G","人工挖坑",30,90,"2026.2-2026.5"],
+["LWBD-WGC-20251228","79","班昆","卡捏","S04-F6-24-26-G","人工挖坑",12,90,"2026.2-2026.5"],
+["LWBD-WGC-20251228","80","班昆","香洪","S04-G3-25-26-X","施基肥回土",46,100,"2026.2-2026.5"],
+["LWBD-WGC-20251228","81","班昆","班昆","S04-C3-22-26-G","施基肥回土",30,100,"2026.2-2026.5"],
+["LWBD-WGC-20251228","82","班昆","卡捏","S04-F6-24-26-G","施基肥回土",12,100,"2026.2-2026.5"],
+["LWBD-WGC-20251228","83","班昆","香洪","S04-G3-25-26-X","保水剂栽植",46,150,"2026.2-2026.5"],
+["LWBD-WGC-20251228","84","班昆","班昆","S04-C3-22-26-G","保水剂栽植",30,150,"2026.2-2026.5"],
+["LWBD-WGC-20251228","85","班昆","卡捏","S04-F6-24-26-G","保水剂栽植",12,150,"2026.2-2026.5"],
+["LWBD-WGC-20251228","86","班昆","香洪","S04-G3-25-26-X","带状锄草1",46,85,"2026.5-2026.7"],
+["LWBD-WGC-20251228","87","班昆","班昆","S04-C3-22-26-G","带状锄草1",30,85,"2026.5-2026.7"],
+["LWBD-WGC-20251228","88","班昆","卡捏","S04-F6-24-26-G","带状锄草1",12,85,"2026.5-2026.7"],
+["LWBD-WGC-20251228","89","班昆","香洪","S04-G3-25-26-X","带状锄草2",46,85,"2026.7-2026.9"],
+["LWBD-WGC-20251228","90","班昆","班昆","S04-C3-22-26-G","带状锄草2",30,85,"2026.7-2026.9"],
+["LWBD-WGC-20251228","91","班昆","卡捏","S04-F6-24-26-G","带状锄草2",12,85,"2026.7-2026.9"],
+["LWBD-WGC-20251228","92","班昆","香洪","S04-G3-25-26-X","全砍",6,85,"2026.9-2026.11"],
+["LWBD-WGC-20251228","93","班昆","班昆","S04-C3-22-26-G","全砍",30,85,"2026.9-2026.11"],
+["LWBD-WGC-20251228","94","班昆","卡捏","S04-F6-24-26-G","全砍",12,85,"2026.9-2026.11"],
+["LWBD-WGC-20251228","95","班昆","香洪","S04-G3-25-26-X","人工追肥",46,85,"2026.1-2026.6"],
+["LWBD-WGC-20251228","96","班昆","班昆","S04-C3-22-26-G","人工追肥",30,85,"2026.1-2026.6"],
+["LWBD-WGC-20251228","97","班昆","卡捏","S04-F6-24-26-G","人工追肥",12,85,"2026.1-2026.7"],
+["LWSBD-LYX-20260622","1","班更","阿多","S04-D1-15-23-M","带状砍草",91.97,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","2","班更","阿多","S04-D1-15-24-M","带状砍草",1.05,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","3","班更","阿多","S04-D1-16-23-M","带状砍草",20.05,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","4","班更","阿多","S04-D1-19-24-M","带状砍草",5.05,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","5","班更","班更","S05-A8-10-23-M","带状砍草",25.39,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","6","班更","班更","S05-A8-10-24-M","带状砍草",219.11,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","7","班更","班更","S05-A8-10-25-M","带状砍草",123.09,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","8","班更","班更","S05-A8-11-25-M","带状砍草",92.86,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","9","班更","恒鲁安","S04-C7-15-23-M","带状砍草",236.87,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","10","班更","恒鲁安","S04-C7-15-22-M","带状砍草",78.72,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","11","班更","恒鲁安","S04-C7-17-23-M","带状砍草",10.18,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","12","班更","拉加","S05-D2-16-24-M","带状砍草",191.46,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","13","班更","拉加","S05-D2-17-24-M","带状砍草",132.72,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","14","班更","沙当","S05-A10-23-23-X","带状砍草",19.47,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","15","班更","沙当","S05-A10-16-24-M","带状砍草",87.26,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","16","班更","沙当","S05-A10-17-24-M","带状砍草",32.21,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","17","班更","沙捏依","S05-E6-21-21-X","带状砍草",38.59,32,"2026.5-2026.11"],
+["LWSBD-LYX-20260622","18","班更","沙都哇","S05-E1-18-18-X","带状砍草",29.44,32,"2026.5-2026.11"]
+];
+function contractsLib(){
+  const out = (DB.contracts||[]).slice();
+  const have = new Set(out.map(c=>c.contractNo));
+  BUILTIN_CONTRACTS.forEach(c=>{ if(!have.has(c.contractNo)){ out.push(Object.assign({id:c.contractNo}, c)); have.add(c.contractNo); } });
+  return out;
+}
+function detailLib(){
+  const out = (DB.contractDetails||[]).slice();
+  const have = new Set(out.map(d=>d.join("|")));
+  BUILTIN_DETAILS.forEach(d=>{ const k=d.join("|"); if(!have.has(k)){ out.push(d.slice()); have.add(k); } });
+  return out;
+}
+function setVal(id, v){ const e = document.getElementById(id); if(e) e.value = (v===undefined||v===null)?"":v; }
+function accMatchDetail(){
+  const no = (document.getElementById("acContractNew").value||"").trim();
+  const code = (document.getElementById("acPlot").value||"").trim();
+  const proc = (document.getElementById("acProcess").value||"").trim();
+  if(!no) return;
+  const lib = detailLib();
+  const hit = lib.find(d=>d[0]===no && d[5]===proc && code && (d[4]===code || (d[4].length>=code.length && d[4].slice(0,code.length)===code)))
+          || lib.find(d=>d[0]===no && d[5]===proc && (!code || d[4]===code))
+          || lib.find(d=>d[0]===no && d[5]===proc);
+  if(!hit) return;
+  const t = hit[8]||"", ts = t.split("-");
+  const pad = s=>{ const m = s.match(/^(\d{4})\.(\d{1,2})$/); return m ? m[1]+"-"+String(Number(m[2])).padStart(2,"0") : s; };
+  setVal("acOrderNo", hit[1]);
+  setVal("acFarm", hit[2]);
+  setVal("acLocation", hit[3]);
+  setVal("acContractArea", hit[6]);
+  if(ts[0]) setVal("acStartPlan", pad(ts[0]));
+  if(ts[1]) setVal("acEndPlan", pad(ts[1]));
+  toast("已带出明细：订单"+hit[1]+"｜"+hit[2]+hit[3]+"｜面积"+hit[6]+"公顷｜"+t);
+}
 /* 作业工序质量标准库（来源：太阳纸业控股老挝《抚育/造林作业各工序主要技术指标》） */
 const PROCESS_LIB = [
  {n:"人工追肥",c:"抚育",r:"合格",s:"施肥坑规格：深×宽×长=20×20×20厘米，每项允许误差＜5厘米。施肥坑位置：第一次追肥距离植株30-40厘米，第二、三、四次施肥坑距离植株0.7-1米。施肥后回满坑。"},
@@ -863,11 +1030,11 @@ function accI(id, label, ph, val, def){
 }
 function accD(id, label, val){ return accI(id, label, "YYYY-MM-DD", val); }
 function renderAcceptance(){
-  const cs = DB.contracts || [];
+  const cs = contractsLib();
   const f = accForm;
   const recs = (DB.acceptanceRecords||[]).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const sel = f.contractNo ? cs.find(c=>c.contractNo===f.contractNo) : null;
-  const opts = cs.map(c=>`<option value="${c.contractNo}" ${f.contractNo===c.contractNo?"selected":""}>${c.contractNo}｜${c.contractor||""}</option>`).join("");
+  const opts = cs.map(c=>`<option value="${c.contractNo}" ${f.contractNo===c.contractNo?"selected":""}>${c.contractNo}｜${c.contractor||""}${c.kind?"（"+c.kind+"）":""}</option>`).join("");
   view.innerHTML = `
     <div class="topbar"><h1>工序验收表</h1>
       <div class="btns"><button class="btn primary" onclick="genAcceptance()">生成表格并保存</button></div>
@@ -875,16 +1042,17 @@ function renderAcceptance(){
     <div class="card" style="margin-bottom:14px">
       <h3>${f.editId ? "编辑验收单 #" + f.editId : "新建验收单"}</h3>
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px">保存目录：${accDir()}（可在「设置」里修改）｜ 生成后自动存到 验收表/{月}/{合同号}/ 下</div>
+      <div style="font-size:12px;color:#2f7d4f;background:rgba(47,125,79,.08);padding:6px 10px;border-radius:6px;margin-bottom:8px">填好「合同号 + 年份林代码 + 作业工序」→ 自动从合同明细带出：订单号 / 林场 / 面积 / 开完工时间（共收录 ${detailLib().length} 条明细）</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px 12px">
         <div class="field"><label>合同号（选或手填）</label>
-          <select id="acContract" onchange="accPickContract()" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px"><option value="">— 从合同库选择 —</option>${opts}</select>
+          <select id="acContract" onchange="accPickContract();accMatchDetail()" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px"><option value="">— 从合同库选择 —</option>${opts}</select>
         </div>
-        <div class="field"><label>合同号（手填）</label><input id="acContractNew" placeholder="如 LWBD-WGC-20251228" value="${sel?sel.contractNo:(f.contractNo||"")}" style="width:100%"></div>
-        ${accI("acOrderNo","订单号","如 30","", f.orderNo)}
-        ${accI("acLocation","林场及位置","如 班更阿活","", f.location)}
-        ${accI("acPlot","年份林代码","如 S05-A5-19-26-G","", f.plotCode)}
+        <div class="field"><label>合同号（手填）</label><input id="acContractNew" placeholder="如 LWBD-WGC-20251228" oninput="accMatchDetail()" value="${sel?sel.contractNo:(f.contractNo||"")}" style="width:100%"></div>
+        ${accI("acOrderNo","订单号（明细带出）","如 30","", f.orderNo)}
+        ${accI("acLocation","林班/位置（明细带出）","如 班更阿活","", f.location)}
+        ${accI("acPlot","年份林代码","如 S05-A5-19-26-G","", f.plotCode, "")}
         <div class="field"><label>作业工序（可选可手输）</label>
-          <input id="acProcess" list="acProcessList" placeholder="选择或输入，如 带状铲草2" value="${accF(f.process,"")}" oninput="accMatchProcess()" style="width:100%">
+          <input id="acProcess" list="acProcessList" placeholder="选择或输入，如 带状铲草2" value="${accF(f.process,"")}" oninput="accMatchProcess();accMatchDetail()" style="width:100%">
           <datalist id="acProcessList">${processLib().map(p=>`<option value="${p.n}">${p.c}｜${p.s.slice(0,24)}…</option>`).join("")}</datalist>
         </div>
         ${accI("acQuality","质量标准（选工序后自动填入，可改）","标准文本","", f.qualityStd, "")}
@@ -937,12 +1105,14 @@ function renderAcceptance(){
       <h3>合同库（${cs.length}）</h3>
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px">合同号输过一次后，林区/林场/包商/经理/责任人自动带出。</div>
       <div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto">
-        ${cs.length?cs.map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;flex-wrap:wrap">
-          <div style="flex:1;min-width:220px"><b>${c.contractNo}</b> ｜ ${c.contractor||"—"}<br><span style="font-size:12px;color:var(--sub)">${c.areaName||""} ${c.farm||""} ｜ 签订 ${c.signDate||"—"}</span></div>
+        ${cs.length?cs.map(c=>{
+          const builtin = BUILTIN_CONTRACTS.some(b=>b.contractNo===c.contractNo);
+          return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px"><b>${c.contractNo}</b> ｜ ${c.contractor||"—"}${c.kind?"（"+c.kind+"）":""} ${builtin?'<span style="font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:4px;padding:0 4px">内置</span>':""}<br><span style="font-size:12px;color:var(--sub)">${c.areaName||""} ${c.farm||""} ｜ 签订 ${c.signDate||"—"} ｜ 明细 ${detailLib().filter(d=>d[0]===c.contractNo).length} 条</span></div>
           <div class="btns">
             <button class="btn" onclick="fillContract('${c.contractNo}')">用于新单</button>
-            <button class="btn" onclick="delContract('${c.contractNo}')">删除</button>
-          </div></div>`).join(""):`<div style="color:var(--sub);font-size:13px">合同库为空——填好上面的合同信息后点「把合同信息存入合同库」</div>`}
+            ${builtin?"":`<button class="btn" onclick="delContract('${c.contractNo}')">删除</button>`}
+          </div></div>`}).join(""):`<div style="color:var(--sub);font-size:13px">合同库为空——填好上面的合同信息后点「把合同信息存入合同库」</div>`}
       </div>
     </div>`;
 }
