@@ -265,7 +265,6 @@ const NAV = [
   {hash:"#/material",icon:"肥", label:"物资台账(肥料/除草剂)"},
   {hash:"#/forest",  icon:"林", label:"林地台账"},
   {hash:"#/burn",    icon:"焚", label:"清点焚烧登记"},
-  {hash:"#/weekplan", icon:"周", label:"周工作计划"},
   {hash:"#/inspect", icon:"改", label:"林场整改台账"},
   {hash:"#/seedling",icon:"苗", label:"苗木成活率"},
   {hash:"#/acceptance",icon:"验", label:"工序验收表"},
@@ -616,9 +615,44 @@ function addSubsidy(e){
 /* ================= 周计划 ================= */
 function renderPlan(){
   const wt = DB.weeklyTasks;
+  const mon = mondayStr(0);
+  const sunD = new Date(); const d0=(sunD.getDay()+6)%7; sunD.setDate(sunD.getDate()-d0+6);
+  const sun = fmtD(sunD);
+  const mNum = Number(mon.slice(5,7));
+  const weekNo = Math.ceil(Number(mon.slice(8,10))/7);
+  const weekLabel = `${mNum}月第${["一","二","三","四","五","六","七"][weekNo-1]}周`;
+  const list = DB.weekPlans.filter(w=>w.week===mon);
+  const ed = weekEdit>=0 ? DB.weekPlans[weekEdit] : null;
   view.innerHTML = `
     <div class="topbar"><h1>本周工作计划</h1></div>
+    <div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <b style="font-size:15px">${weekLabel}（${mon} ~ ${sun}）</b>
+      <button class="btn primary" onclick="exportWeekExcel()">导出周报 Excel（公司格式）</button>
+    </div>
     <div class="card">
+      <h3 style="margin:0 0 8px">按公司模板分类填写</h3>
+      <form onsubmit="saveWeekPlan(event)">
+        <div class="field"><label>工作类别</label><select name="cat">${WEEK_CATS.map(c=>`<option ${ed&&ed.cat===c?"selected":""}>${c}</option>`).join("")}</select></div>
+        <div class="field" style="flex:1;min-width:220px"><label>需要完成的工作</label><input name="content" required placeholder="如：班更林场 S05 全砍作业验收" value="${ed?esc(ed.content):""}"></div>
+        <div class="field" style="align-self:end">
+          <button class="btn primary" type="submit">${ed?"保存修改":"添加"}</button>
+          ${ed?`<button type="button" class="btn" onclick="weekEdit=-1;renderPlan()">取消</button>`:""}
+        </div>
+      </form>
+      ${WEEK_CATS.map(cat=>{
+        const rows = list.filter(x=>x.cat===cat);
+        if(!rows.length) return "";
+        return `<div style="margin-top:10px"><b style="color:var(--blue)">${cat}</b>${rows.map(x=>{
+          const gi = DB.weekPlans.indexOf(x);
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f2f5">
+            <span style="white-space:pre-wrap">${esc(x.content)}</span>
+            <span><button class="btn" onclick="weekEdit=${gi};renderPlan()">改</button> <button class="btn danger" onclick="delRec('weekPlans',${gi})">删</button></span>
+          </div>`;
+        }).join("")}</div>`;
+      }).join("") || '<div class="empty" style="margin-top:8px">还没有分类计划，先在上方添加第一项</div>'}
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 8px">待办事项（其他工作）</h3>
       <form onsubmit="addTask(event)">
         <div class="field full"><label>新任务</label><input name="text" placeholder="本周要做什么？" required></div>
         <div class="field"><label>备注（交付时间等）</label><input name="note" placeholder="选填，如 交付 10/5"></div>
@@ -628,8 +662,33 @@ function renderPlan(){
         <div class="task-line ${x.done?'done':''}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f2f5">
           <span><input type="checkbox" ${x.done?"checked":""} onchange="toggleTask(${i})">　${esc(x.text)}${x.note?`<span class="tag">${esc(x.note)}</span>`:""}</span>
           <button class="btn danger" onclick="delTask(${i})">删</button>
-        </div>`).join("") || '<div class="empty">本周还没有计划</div>'}
+        </div>`).join("") || '<div class="empty">本周还没有待办</div>'}
     </div>`;
+}
+function exportWeekExcel(){
+  if(typeof XLSX === "undefined"){ alert("Excel 组件未加载"); return; }
+  const mon = mondayStr(0);
+  const mNum = Number(mon.slice(5,7));
+  const weekNo = Math.ceil(Number(mon.slice(8,10))/7);
+  const weekLabel = `${mNum}月第${["一","二","三","四","五","六","七"][weekNo-1]}周`;
+  const list = DB.weekPlans.filter(w=>w.week===mon);
+  const catText = cat => list.filter(x=>x.cat===cat).map((x,i)=>`${i+1}、${x.content}`).join("\n");
+  const todoText = (DB.weeklyTasks||[]).map((x,i)=>`${i+1}、${x.text}${x.note?`（${x.note}）`:""}`).join("\n");
+  const other = [catText("其他工作"), todoText].filter(Boolean).join("\n");
+  const aoa = [
+    ["", "考核区域", "现场重点巡查", "质量问题复核", "工序作业验收", "图纸制作", "其他工作"],
+    ["", "色奔东", catText("现场重点巡查"), catText("质量问题复核"), catText("工序作业验收"), catText("图纸制作"), other],
+    ["", "色奔西", "", "", "", "", ""],
+    ["", "孟品", "", "", "", "", ""],
+    ["", "沙湾", "", "", "", "", ""]
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [{wch:4},{wch:10},{wch:46},{wch:30},{wch:46},{wch:20},{wch:30}];
+  ws["!rows"] = [{hpt:20},{hpt:120},{hpt:20},{hpt:20},{hpt:20}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, weekLabel);
+  XLSX.writeFile(wb, `考核部周工作计划-${weekLabel}.xlsx`);
+  toast("已导出 Excel");
 }
 function addTask(e){ e.preventDefault(); const f=e.target; DB.weeklyTasks.push({text:f.text.value, note:f.note.value, done:false}); save(); toast("已添加"); renderPlan(); }
 function toggleTask(i){ DB.weeklyTasks[i].done=!DB.weeklyTasks[i].done; save(); renderPlan(); }
@@ -2418,10 +2477,10 @@ function renderWeekPlan(){
 }
 function saveWeekPlan(e){
   e.preventDefault(); const f=e.target;
-  const rec={week:f.week.value, cat:f.cat.value, content:f.content.value.trim(), status:f.status.value};
+  const rec={week:mondayStr(0), cat:f.cat.value, content:f.content.value.trim(), status:"待完成"};
   if(weekEdit>=0 && DB.weekPlans[weekEdit]){ DB.weekPlans[weekEdit]=rec; weekEdit=-1; }
   else DB.weekPlans.push(rec);
-  save(); toast("已保存"); renderWeekPlan();
+  save(); toast("已保存"); renderPlan();
 }
 function weekDone(i){
   DB.weekPlans[i].status = DB.weekPlans[i].status==="已完成"?"待完成":"已完成";
