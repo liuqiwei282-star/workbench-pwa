@@ -613,20 +613,21 @@ function addSubsidy(e){
 }
 
 /* ================= 周计划 ================= */
+function weekStartFriStr(){ const d=new Date(); const off=(d.getDay()-5+7)%7; d.setDate(d.getDate()-off); return fmtD(d); }
 function renderPlan(){
   const wt = DB.weeklyTasks;
-  const mon = mondayStr(0);
-  const sunD = new Date(); const d0=(sunD.getDay()+6)%7; sunD.setDate(sunD.getDate()-d0+6);
-  const sun = fmtD(sunD);
-  const mNum = Number(mon.slice(5,7));
-  const weekNo = Math.ceil(Number(mon.slice(8,10))/7);
+  const fri = weekStartFriStr();
+  const sunD = new Date(); const off=(sunD.getDay()-5+7)%7; sunD.setDate(sunD.getDate()-off+6);
+  const thu = fmtD(sunD);
+  const mNum = Number(fri.slice(5,7));
+  const weekNo = Math.ceil(Number(fri.slice(8,10))/7);
   const weekLabel = `${mNum}月第${["一","二","三","四","五","六","七"][weekNo-1]}周`;
-  const list = DB.weekPlans.filter(w=>w.week===mon);
+  const list = DB.weekPlans.filter(w=>w.week===fri);
   const ed = weekEdit>=0 ? DB.weekPlans[weekEdit] : null;
   view.innerHTML = `
     <div class="topbar"><h1>本周工作计划</h1></div>
     <div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <b style="font-size:15px">${weekLabel}（${mon} ~ ${sun}）</b>
+      <b style="font-size:15px">${weekLabel}（${fri} ~ ${thu}）</b>
       <button class="btn primary" onclick="exportWeekExcel()">导出周报 Excel（公司格式）</button>
     </div>
     <div class="card">
@@ -667,11 +668,11 @@ function renderPlan(){
 }
 function exportWeekExcel(){
   if(typeof XLSX === "undefined"){ alert("Excel 组件未加载"); return; }
-  const mon = mondayStr(0);
-  const mNum = Number(mon.slice(5,7));
-  const weekNo = Math.ceil(Number(mon.slice(8,10))/7);
+  const fri = weekStartFriStr();
+  const mNum = Number(fri.slice(5,7));
+  const weekNo = Math.ceil(Number(fri.slice(8,10))/7);
   const weekLabel = `${mNum}月第${["一","二","三","四","五","六","七"][weekNo-1]}周`;
-  const list = DB.weekPlans.filter(w=>w.week===mon);
+  const list = DB.weekPlans.filter(w=>w.week===fri);
   const catText = cat => list.filter(x=>x.cat===cat).map((x,i)=>`${i+1}、${x.content}`).join("\n");
   const todoText = (DB.weeklyTasks||[]).map((x,i)=>`${i+1}、${x.text}${x.note?`（${x.note}）`:""}`).join("\n");
   const other = [catText("其他工作"), todoText].filter(Boolean).join("\n");
@@ -2477,7 +2478,7 @@ function renderWeekPlan(){
 }
 function saveWeekPlan(e){
   e.preventDefault(); const f=e.target;
-  const rec={week:mondayStr(0), cat:f.cat.value, content:f.content.value.trim(), status:"待完成"};
+  const rec={week:weekStartFriStr(), cat:f.cat.value, content:f.content.value.trim(), status:"待完成"};
   if(weekEdit>=0 && DB.weekPlans[weekEdit]){ DB.weekPlans[weekEdit]=rec; weekEdit=-1; }
   else DB.weekPlans.push(rec);
   save(); toast("已保存"); renderPlan();
