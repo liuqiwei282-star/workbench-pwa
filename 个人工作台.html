@@ -2303,44 +2303,54 @@ function burnDone(i){
 
 /* ================= 林场整改台账 ================= */
 const FORESTS = ["班更","班昆","帕罗","恒鲁安","祖晃","考更","拉火","首显","阿多","沙等"];
+let inspectEdit = -1;
 function renderInspect(){
-  const list = DB.inspectRecords.slice().sort((a,b)=>(b.foundDate||"").localeCompare(a.foundDate||""));
-  const cnt = s => list.filter(x=>x.status===s).length;
+  const list = DB.inspectRecords.map((r,di)=>({r,di})).sort((a,b)=>(b.r.foundDate||"").localeCompare(a.r.foundDate||""));
+  const cnt = s => list.filter(x=>x.r.status===s).length;
+  const ed = inspectEdit>=0 ? DB.inspectRecords[inspectEdit] : null;
+  const selOpt = (arr, cur) => arr.map(o=>`<option ${o===cur?"selected":""}>${o}</option>`).join("");
   view.innerHTML = `
     <div class="topbar"><h1>林场整改台账</h1></div>
     <div class="stats">
-      <div class="stat"><div class="label">整改记录</div><div class="num">${list.length}</div></div>
+      <div class="stat"><div class="label">整改记录</div><div class="num">${DB.inspectRecords.length}</div></div>
       <div class="stat"><div class="label">待整改</div><div class="num" style="color:var(--orange)">${cnt("待整改")}</div></div>
       <div class="stat"><div class="label">已整改</div><div class="num" style="color:var(--blue)">${cnt("已整改")}</div></div>
       <div class="stat"><div class="label">复核通过</div><div class="num" style="color:var(--green)">${cnt("复核通过")}</div></div>
     </div>
     <div class="card">
-      <form onsubmit="addInspect(event)">
-        <div class="field"><label>林场</label><input name="forest" list="forestList" required placeholder="如：恒鲁安"><datalist id="forestList">${FORESTS.map(f=>`<option value="${f}">`).join("")}</datalist></div>
-        <div class="field"><label>整改点</label><input name="point" required placeholder="如：3号林班补植区"></div>
-        <div class="field" style="flex:1;min-width:200px"><label>问题描述</label><input name="issue" placeholder="问题内容"></div>
-        <div class="field"><label>责任人</label><input name="owner" placeholder="姓名"></div>
-        <div class="field"><label>发现日期</label><input type="date" name="foundDate" value="${todayStr()}" required></div>
-        <div class="field"><label>状态</label><select name="status"><option>待整改</option><option>已整改</option><option>复核通过</option></select></div>
-        <div class="field"><label>完成日期</label><input type="date" name="doneDate"></div>
-        <div class="field" style="align-self:end"><button class="btn primary" type="submit">添加</button></div>
+      <form onsubmit="saveInspect(event)">
+        <div class="field"><label>林场</label><input name="forest" list="forestList" required placeholder="如：恒鲁安" value="${ed?esc(ed.forest):""}"><datalist id="forestList">${FORESTS.map(f=>`<option value="${f}">`).join("")}</datalist></div>
+        <div class="field"><label>林班代码</label><input name="point" required placeholder="如：S04-C2-13-21-M" value="${ed?esc(ed.point):""}"></div>
+        <div class="field" style="flex:1;min-width:200px"><label>问题描述</label><input name="issue" placeholder="问题内容" value="${ed?esc(ed.issue):""}"></div>
+        <div class="field"><label>责任人</label><input name="owner" placeholder="姓名" value="${ed?esc(ed.owner):""}"></div>
+        <div class="field"><label>发现日期</label><input type="date" name="foundDate" value="${ed?ed.foundDate:todayStr()}" required></div>
+        <div class="field"><label>状态</label><select name="status">${selOpt(["待整改","已整改","复核通过"], ed?ed.status:"待整改")}</select></div>
+        <div class="field"><label>完成日期</label><input type="date" name="doneDate" value="${ed?ed.doneDate:""}"></div>
+        <div class="field"><label>备注</label><input name="note" value="${ed?esc(ed.note||""):""}"></div>
+        <div class="field" style="align-self:end">
+          <button class="btn primary" type="submit">${ed?"保存修改":"添加"}</button>
+          ${ed?`<button type="button" class="btn" onclick="inspectEdit=-1;renderInspect()">取消</button>`:""}
+        </div>
       </form>
     </div>
-    <div class="card">${matTable(["林场","整改点","问题","责任人","发现日期","状态","完成日期","备注","操作"],
-      list.map((x,i)=>{
-        const late = x.status==="待整改" && x.foundDate && (Date.now()-new Date(x.foundDate).getTime())>30*864e5;
+    <div class="card">${matTable(["林场","林班代码","问题","责任人","发现日期","状态","完成日期","备注","操作"],
+      list.map(x=>{
+        const r = x.r;
+        const late = r.status==="待整改" && r.foundDate && (Date.now()-new Date(r.foundDate).getTime())>30*864e5;
         return `<tr>
-          <td>${esc(x.forest)}</td><td>${esc(x.point)}</td><td>${esc(x.issue)}</td><td>${esc(x.owner)}</td>
-          <td>${esc(x.foundDate)}${late?' <span style="color:var(--red)">超期</span>':""}</td>
-          <td style="color:${x.status==="复核通过"?"var(--green)":x.status==="已整改"?"var(--blue)":"var(--orange)"}">${esc(x.status)}</td>
-          <td>${esc(x.doneDate)}</td><td>${esc(x.note)}</td>
-          <td><button class="btn" onclick="inspectNext(${i})">推进</button> <button class="btn danger" onclick="delRec('inspectRecords',${i})">删</button></td></tr>`;}))}
+          <td>${esc(r.forest)}</td><td>${esc(r.point)}</td><td>${esc(r.issue)}</td><td>${esc(r.owner)}</td>
+          <td>${esc(r.foundDate)}${late?' <span style="color:var(--red)">超期</span>':""}</td>
+          <td style="color:${r.status==="复核通过"?"var(--green)":r.status==="已整改"?"var(--blue)":"var(--orange)"}">${esc(r.status)}</td>
+          <td>${esc(r.doneDate)}</td><td>${esc(r.note)}</td>
+          <td><button class="btn" onclick="inspectNext(${x.di})">推进</button> <button class="btn" onclick="inspectEdit=${x.di};renderInspect()">改</button> <button class="btn danger" onclick="delRec('inspectRecords',${x.di})">删</button></td></tr>`;}))}
     </div>`;
 }
-function addInspect(e){
+function saveInspect(e){
   e.preventDefault(); const f = e.target;
-  DB.inspectRecords.push({forest:f.forest.value.trim(), point:f.point.value.trim(), issue:f.issue.value.trim(),
-    owner:f.owner.value.trim(), foundDate:f.foundDate.value, status:f.status.value, doneDate:f.doneDate.value||"", note:f.note?f.note.value.trim():""});
+  const rec = {forest:f.forest.value.trim(), point:f.point.value.trim(), issue:f.issue.value.trim(),
+    owner:f.owner.value.trim(), foundDate:f.foundDate.value, status:f.status.value, doneDate:f.doneDate.value||"", note:f.note?f.note.value.trim():""};
+  if(inspectEdit>=0 && DB.inspectRecords[inspectEdit]){ DB.inspectRecords[inspectEdit] = rec; inspectEdit = -1; }
+  else { DB.inspectRecords.push(rec); }
   save(); renderInspect();
 }
 function inspectNext(i){
