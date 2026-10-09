@@ -153,6 +153,7 @@ const defaultData = () => ({
   herbicideUsage: [],   // 除草剂使用明细(箱)
   herbicideList: [],    // 除草剂林班发放表
   burnRecords: [],      // 清点焚烧 {date,place,type,count,status,note}
+  weekPlans: [],        // 周工作计划 {week(周一日期), cat, content, status}
   inspectRecords: [],   // 林场整改 {forest,point,issue,owner,foundDate,status,doneDate,note}
   seedlingRecords: [],  // 苗木成活率 {date,forest,block,area,unit,planted,survived,note}
   archiveRecords: [],   // 验收资料 {date,type,name,project,status,note}
@@ -264,6 +265,7 @@ const NAV = [
   {hash:"#/material",icon:"肥", label:"物资台账(肥料/除草剂)"},
   {hash:"#/forest",  icon:"林", label:"林地台账"},
   {hash:"#/burn",    icon:"焚", label:"清点焚烧登记"},
+  {hash:"#/weekplan", icon:"周", label:"周工作计划"},
   {hash:"#/inspect", icon:"改", label:"林场整改台账"},
   {hash:"#/seedling",icon:"苗", label:"苗木成活率"},
   {hash:"#/acceptance",icon:"验", label:"工序验收表"},
@@ -567,8 +569,9 @@ function addMileage(e){
   const ex = DB.mileages.findIndex(x=>x.date===date);
   if(ex>=0){ DB.mileages[ex].km = km; if(note) DB.mileages[ex].note = note; }
   else DB.mileages.push({date, km, note});
-  const lg = DB.workLogs.find(x=>x.date===date);
-  if(lg) lg.mileage = String(km);
+  let lg = DB.workLogs.find(x=>x.date===date);
+  if(!lg){ lg = {date, place:"", mileage:String(km), content:"", weather:""}; DB.workLogs.push(lg); }
+  else lg.mileage = String(km);
   save(); toast("已保存并同步到工作日志"); renderMileage();
 }
 function delMileage(date){
@@ -1675,6 +1678,7 @@ function route(){
   else if(h==="#/material") renderMaterial();
   else if(h==="#/forest") renderForest();
   else if(h==="#/burn") renderBurn();
+  else if(h==="#/weekplan") renderWeekPlan();
   else if(h==="#/inspect") renderInspect();
   else if(h==="#/seedling") renderSeedling();
   else if(h==="#/acceptance") renderAcceptance();
@@ -2361,6 +2365,69 @@ function inspectNext(i){
   save(); renderInspect();
 }
 
+/* ================= 周工作计划 ================= */
+let weekOffset = 0, weekEdit = -1;
+const WEEK_CATS = ["现场重点巡查","质量问题复核","工序作业验收","图纸制作","其他工作"];
+function fmtD(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function mondayStr(offset){ const d=new Date(); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day+(offset||0)*7); return fmtD(d); }
+function renderWeekPlan(){
+  const mon = mondayStr(weekOffset);
+  const sunD = new Date(); const day0=(sunD.getDay()+6)%7; sunD.setDate(sunD.getDate()-day0+weekOffset*7+6);
+  const sun = fmtD(sunD);
+  const list = DB.weekPlans.filter(w=>w.week===mon).sort((a,b)=>WEEK_CATS.indexOf(a.cat)-WEEK_CATS.indexOf(b.cat));
+  const done = list.filter(x=>x.status==="已完成").length;
+  const isFriday = new Date().getDay()===5;
+  const ed = weekEdit>=0 ? DB.weekPlans[weekEdit] : null;
+  view.innerHTML = `
+    <div class="topbar"><h1>周工作计划</h1></div>
+    ${isFriday?`<div class="card" style="border-left:4px solid var(--blue);padding:10px 14px;margin-bottom:12px">今天是周五：记得发送本周周报；提交下周计划时，把下方「所属周(周一日期)」选成下周的周一即可。</div>`:""}
+    <div class="stats">
+      <div class="stat"><div class="label">本周任务</div><div class="num">${list.length}<small> 项</small></div></div>
+      <div class="stat"><div class="label">已完成</div><div class="num" style="color:var(--green)">${done}</div></div>
+      <div class="stat"><div class="label">待完成</div><div class="num" style="color:var(--orange)">${list.length-done}</div></div>
+      <div class="stat"><div class="label">完成率</div><div class="num">${list.length?Math.round(done/list.length*100):0}<small>%</small></div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn" onclick="weekOffset--;renderWeekPlan()">&lt; 上一周</button>
+        <b style="font-size:15px">${mon} ~ ${sun}${weekOffset===0?'（本周）':''}</b>
+        <button class="btn" onclick="weekOffset++;renderWeekPlan()">下一周 &gt;</button>
+        ${weekOffset!==0?`<button class="btn" onclick="weekOffset=0;renderWeekPlan()">回到本周</button>`:""}
+      </div>
+      <form onsubmit="saveWeekPlan(event)">
+        <div class="field"><label>所属周(周一日期)</label><input type="date" name="week" value="${ed?ed.week:mon}" required></div>
+        <div class="field"><label>工作类别</label><select name="cat">${WEEK_CATS.map(c=>`<option ${ed&&ed.cat===c?"selected":""}>${c}</option>`).join("")}</select></div>
+        <div class="field" style="flex:1;min-width:220px"><label>需要完成的工作</label><input name="content" required placeholder="如：班更林场 S05 全砍作业验收" value="${ed?esc(ed.content):""}"></div>
+        <div class="field"><label>状态</label><select name="status"><option ${ed&&ed.status==="已完成"?"selected":""}>已完成</option><option ${(!ed||ed.status!=="已完成")?"selected":""}>待完成</option></select></div>
+        <div class="field" style="align-self:end">
+          <button class="btn primary" type="submit">${ed?"保存修改":"添加"}</button>
+          ${ed?`<button type="button" class="btn" onclick="weekEdit=-1;renderWeekPlan()">取消</button>`:""}
+        </div>
+      </form>
+    </div>
+    ${matTable(["类别","需要完成的工作","状态","操作"],
+      list.map(x=>{
+        const gi = DB.weekPlans.indexOf(x);
+        return `<tr>
+          <td>${esc(x.cat)}</td>
+          <td style="white-space:pre-wrap">${esc(x.content)}</td>
+          <td style="color:${x.status==="已完成"?"var(--green)":"var(--orange)"}">${esc(x.status)}</td>
+          <td><button class="btn" onclick="weekDone(${gi})">${x.status==="已完成"?"回待办":"标完成"}</button> <button class="btn" onclick="weekEdit=${gi};renderWeekPlan()">改</button> <button class="btn danger" onclick="delRec('weekPlans',${gi})">删</button></td>
+        </tr>`;
+      }), "这一周还没有计划，在上方添加第一项吧")}`;
+}
+function saveWeekPlan(e){
+  e.preventDefault(); const f=e.target;
+  const rec={week:f.week.value, cat:f.cat.value, content:f.content.value.trim(), status:f.status.value};
+  if(weekEdit>=0 && DB.weekPlans[weekEdit]){ DB.weekPlans[weekEdit]=rec; weekEdit=-1; }
+  else DB.weekPlans.push(rec);
+  save(); toast("已保存"); renderWeekPlan();
+}
+function weekDone(i){
+  DB.weekPlans[i].status = DB.weekPlans[i].status==="已完成"?"待完成":"已完成";
+  save(); renderWeekPlan();
+}
+
 /* ================= 苗木成活率 ================= */
 function renderSeedling(){
   const list = DB.seedlingRecords.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
@@ -2862,6 +2929,7 @@ function addWorkLog(e){
   (f.locOther.value||"").split(/[、,，\s]+/).forEach(s=>{ if(s) locs.push(s); });
   const date = f.date.value;
   const rec = {date, place:locs.join("、"), mileage:f.mileage.value.trim(), content:f.content.value.trim(), done:f.done.value==="1"};
+  if(!rec.mileage){ const m=(DB.mileages||[]).find(x=>x.date===date); if(m) rec.mileage=String(m.km); }
   const ex = DB.workLogs.findIndex(x=>x.date===date);
   if(ex>=0){ DB.workLogs[ex] = Object.assign({}, DB.workLogs[ex], rec); toast("已更新当天记录"); }
   else { DB.workLogs.push(rec); toast("已保存"); }
@@ -2907,7 +2975,9 @@ function wlPickLoc(loc, form){
   else { cur.push(loc); inp.value = cur.join("、"); }
 }
 function wlForm(i){
-  const r = i>=0 ? DB.workLogs[i] : {date:todayStr(),place:"",mileage:"",content:"",weather:""};
+  let r = i>=0 ? DB.workLogs[i] : null;
+  if(!r) r = {date:todayStr(),place:"",mileage:"",content:"",weather:""};
+  if(!r.mileage){ const m=(DB.mileages||[]).find(x=>x.date===r.date); if(m) r.mileage=String(m.km); }
   return `<div style="background:#f8fafc;border:1px dashed var(--line);border-radius:8px;padding:12px 10px;margin-bottom:4px">
     <form onsubmit="wlSave(event,${i})" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
       <div class="field" style="margin:0"><label>日期</label><input type="date" name="date" value="${r.date}" required></div>
@@ -2927,6 +2997,7 @@ function wlSave(e, i){
   const rec = {date:f.date.value, place:f.place.value.trim(), mileage:f.mileage.value.trim(),
     content:f.content.value.trim(), weather:f.weather.value.trim(),
     done: i>=0 ? !!(DB.workLogs[i]&&DB.workLogs[i].done) : false};
+  if(!rec.mileage){ const m=(DB.mileages||[]).find(x=>x.date===rec.date); if(m) rec.mileage=String(m.km); }
   if(i>=0) DB.workLogs[i] = rec; else DB.workLogs.push(rec);
   syncKmBoth(rec.date, rec.mileage);
   wlEdit = null; save(); renderWork();
