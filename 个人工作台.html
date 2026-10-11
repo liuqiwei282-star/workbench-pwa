@@ -155,7 +155,8 @@ const defaultData = () => ({
   burnRecords: [],      // 清点焚烧 {date,place,type,count,status,note}
   weekPlans: [],        // 周工作计划 {week(周一日期), cat, content, status}
   inspectRecords: [],   // 林场整改 {forest,point,issue,owner,foundDate,status,doneDate,note}
-  seedlingRecords: [],  // 苗木成活率 {date,forest,block,area,unit,planted,survived,note}
+  seedlingRecords: [],  // 蓄积量调查-历史简单成活率（兼容保留）
+  surveyRecords: [],    // 蓄积量调查-新造林保存率样地记录 {date,plantDate,forest,block,plot,plotArea,alive,dead,heights}
   archiveRecords: [],   // 验收资料 {date,type,name,project,status,note}
   phrases: [],          // 常用语库 {text,category}
   seedlingUsage: [],    // 苗木使用 {region,forest,block,code,area,qty}
@@ -266,7 +267,7 @@ const NAV = [
   {hash:"#/forest",  icon:"林", label:"林地台账"},
   {hash:"#/burn",    icon:"焚", label:"清点焚烧登记"},
   {hash:"#/inspect", icon:"改", label:"林场整改台账"},
-  {hash:"#/seedling",icon:"苗", label:"苗木成活率"},
+  {hash:"#/seedling",icon:"苗", label:"蓄积量调查"},
   {hash:"#/acceptance",icon:"验", label:"工序验收表"},
   {hash:"#/archive", icon:"档", label:"验收资料台账"},
   {group:"总结"},
@@ -2488,47 +2489,104 @@ function weekDone(i){
   save(); renderWeekPlan();
 }
 
-/* ================= 苗木成活率 ================= */
+/* ================= 蓄积量调查 ================= */
+let seedlingTab = "new";   // new=新造林保存率调查 | old=多年林蓄积量调查(预留)
 function renderSeedling(){
-  const list = DB.seedlingRecords.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
-  const totArea = list.reduce((a,r)=>a+Number(r.area||0),0);
-  const totP = list.reduce((a,r)=>a+Number(r.planted||0),0);
-  const totS = list.reduce((a,r)=>a+Number(r.survived||0),0);
-  const rate = totP? (totS/totP*100).toFixed(1) : 0;
+  const tabs = [["new","新造林保存率调查"],["old","多年林蓄积量调查"]];
   view.innerHTML = `
-    <div class="topbar"><h1>苗木成活率核算</h1></div>
-    <div class="stats">
-      <div class="stat"><div class="label">核算地块</div><div class="num">${list.length}<small> 个</small></div></div>
-      <div class="stat"><div class="label">合计面积</div><div class="num">${totArea}<small> ${list[0]?.unit||"亩"}</small></div></div>
-      <div class="stat"><div class="label">总成活率</div><div class="num" style="color:var(--green)">${rate}<small>%</small></div></div>
-    </div>
+    <div class="topbar"><h1>蓄积量调查</h1>
+      <div class="btns">${tabs.map(t=>`<button class="btn ${seedlingTab===t[0]?"primary":""}" onclick="seedlingTab='${t[0]}';renderSeedling()">${t[1]}</button>`).join("")}</div>
+    </div>`;
+  if(seedlingTab==="new") renderNewSurvey(); else renderVolumeSurvey();
+}
+/* ---------- 新造林保存率调查（参照公司调查表模板公式） ---------- */
+function renderNewSurvey(){
+  view.innerHTML += `
+    <div class="card" style="font-size:12px;color:var(--sub)">每 10 公顷设 1 个 500㎡ 样地 · 第三行树高用逗号分隔录入（如 3.4,3.8,2.9）· 输入后自动计算保存率 / 公顷株数 / 月均树高 / 均匀度 / 评级</div>
     <div class="card">
-      <form onsubmit="addSeedling(event)">
-        <div class="field"><label>日期</label><input type="date" name="date" value="${todayStr()}" required></div>
-        <div class="field"><label>林场</label><input name="forest" list="forestList" required></div>
-        <div class="field"><label>林班/地块</label><input name="block" required placeholder="如：3号林班"></div>
-        <div class="field"><label>面积</label><input type="number" step="0.01" name="area" required></div>
-        <div class="field"><label>单位</label><select name="unit"><option>亩</option><option>公顷</option></select></div>
-        <div class="field"><label>种植株数</label><input type="number" name="planted" required></div>
-        <div class="field"><label>成活株数</label><input type="number" name="survived" required></div>
-        <div class="field"><label>备注</label><input name="note"></div>
-        <div class="field" style="align-self:end"><button class="btn primary" type="submit">添加</button></div>
+      <form onsubmit="addSurvey(event)" id="surveyForm">
+        <div class="field"><label>调查日期</label><input type="date" name="date" value="${todayStr()}" oninput="surveyPreview()" required></div>
+        <div class="field"><label>种植日期</label><input type="date" name="plantDate" oninput="surveyPreview()" required></div>
+        <div class="field"><label>林场</label><input name="forest" list="forestList" oninput="surveyPreview()" required></div>
+        <div class="field"><label>林班/地块</label><input name="block" oninput="surveyPreview()" required placeholder="如：S04-G1-25-25"></div>
+        <div class="field"><label>样地号</label><input name="plot" oninput="surveyPreview()" placeholder="如：1"></div>
+        <div class="field"><label>样地面积㎡</label><input type="number" step="1" name="plotArea" value="500" oninput="surveyPreview()"></div>
+        <div class="field"><label>√成活株数</label><input type="number" step="1" name="alive" oninput="surveyPreview()" required></div>
+        <div class="field"><label>×死亡株数</label><input type="number" step="1" name="dead" value="0" oninput="surveyPreview()"></div>
+        <div class="field" style="flex:1;min-width:200px"><label>第三行树高（米，逗号分隔）</label><input name="heights" oninput="surveyPreview()" placeholder="3.4,3.8,2.9"></div>
+        <div class="field" style="align-self:end"><button class="btn primary" type="submit">添加记录</button></div>
       </form>
-      <div style="font-size:12px;color:var(--sub)">1 公顷 = 15 亩 · 成活率自动计算</div>
-    </div>
-    <div class="card">${matTable(["日期","林场","林班","面积","单位","种植","成活","成活率","备注","操作"],
-      list.map((x,i)=>`<tr>
-        <td>${esc(x.date)}</td><td>${esc(x.forest)}</td><td>${esc(x.block)}</td><td>${x.area}</td><td>${esc(x.unit)}</td>
-        <td>${x.planted}</td><td>${x.survived}</td>
-        <td style="color:var(--green);font-weight:600">${x.planted?(x.survived/x.planted*100).toFixed(1):0}%</td>
-        <td>${esc(x.note)}</td><td><button class="btn danger" onclick="delRec('seedlingRecords',${i})">删</button></td></tr>`))}
+      <div id="surveyPreview"></div>
+    </div>`;
+  const list = DB.surveyRecords.map((x,i)=>({x,i})).sort((a,b)=>(b.x.date||"").localeCompare(a.x.date||""));
+  view.innerHTML += `<div class="card">${matTable(["日期","林场/地块","样地","面积㎡","√","×","调查株数","保存率","株/ha","树高m","月均m/月","均匀度","综合","操作"],
+    list.map(({x,i})=>surveyRow(x,i)))}</div>`;
+  surveyPreview();
+}
+function surveyCalc(d){
+  const alive = Math.max(0,+d.alive||0), dead = Math.max(0,+d.dead||0);
+  const total = alive+dead;
+  const rate = total? alive/total*100 : 0;
+  const plotArea = Math.max(1,+d.plotArea||500);
+  const haNum = alive/(plotArea/10000);
+  const hs = String(d.heights||"").split(/[,，、;；\s]+/).map(Number).filter(x=>isFinite(x)&&x>0);
+  const avgH = hs.length? hs.reduce((a,b)=>a+b,0)/hs.length : null;
+  const sd = hs.length>1? Math.sqrt(hs.reduce((a,b)=>a+(b-avgH)*(b-avgH),0)/(hs.length-1)) : null;
+  let months = null;
+  if(d.plantDate && d.date) months = (new Date(d.date)-new Date(d.plantDate))/86400000/30;
+  const perM = (avgH!=null && months!=null && months>0)? avgH/months : null;
+  const T = rate>=95?"好":(rate>=80?"中":"差");
+  const U = (haNum>=1500&&haNum<=1800)?"好":((haNum>=1300&&haNum<=2000)?"中":"差");
+  const V = perM==null?"—":(perM>=0.4?"好":(perM>=0.3?"中":"差"));
+  const W = sd==null?"—":(sd<=0.5?"好":(sd>0.5&&sd<1?"中":"差"));
+  const goods=[T,U,V,W].filter(x=>x==="好").length;
+  const X = (T==="—"||U==="—"||V==="—"||W==="—") ? "—" : (goods===4?"好":(goods>=1?"中":"差"));
+  return {alive,dead,total,rate,plotArea,haNum,avgH,sd,months,perM,T,U,V,W,goods,X};
+}
+function gradeColor(g){ return g==="好"?"var(--green)":g==="中"?"var(--orange)":"var(--red)"; }
+function surveyPreview(){
+  const f = document.getElementById("surveyForm"); if(!f) return;
+  const r = surveyCalc({date:f.date.value, plantDate:f.plantDate.value, plotArea:f.plotArea.value, alive:f.alive.value, dead:f.dead.value, heights:f.heights.value});
+  document.getElementById("surveyPreview").innerHTML = `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;font-size:13px">
+      <span style="background:var(--bg);border-radius:6px;padding:5px 9px">生长时间：<b>${r.months==null?"—":r.months.toFixed(2)}</b> 月</span>
+      <span style="background:var(--bg);border-radius:6px;padding:5px 9px">调查株数：<b>${r.total}</b></span>
+      <span style="background:var(--bg);border-radius:6px;padding:5px 9px">样地保存率：<b style="color:var(--green)">${r.rate.toFixed(1)}%</b></span>
+      <span style="background:var(--bg);border-radius:6px;padding:5px 9px">公顷株数：<b>${fmtNum(r.haNum)}</b> 株/ha</span>
+      <span style="background:var(--bg);border-radius:6px;padding:5px 9px">平均树高：<b>${r.avgH==null?"—":r.avgH.toFixed(2)}</b> m</span>
+      <span style="background:var(--bg);border-radius:6px;padding:5px 9px">月均树高：<b>${r.perM==null?"—":r.perM.toFixed(2)}</b> m/月</span>
+      <span style="background:var(--bg);border-radius:6px;padding:5px 9px">均匀度(标准差)：<b>${r.sd==null?"—":r.sd.toFixed(2)}</b></span>
+      <span style="background:var(--bg);border-radius:6px;padding:5px 9px">评级：保存率<b style="color:${gradeColor(r.T)}">${r.T}</b> · 株数<b style="color:${gradeColor(r.U)}">${r.U}</b> · 树高<b style="color:${gradeColor(r.V)}">${r.V}</b> · 均匀度<b style="color:${gradeColor(r.W)}">${r.W}</b> · 综合<b style="color:${gradeColor(r.X)}">${r.X}</b></span>
     </div>`;
 }
-function addSeedling(e){
+function addSurvey(e){
   e.preventDefault(); const f = e.target;
-  DB.seedlingRecords.push({date:f.date.value, forest:f.forest.value.trim(), block:f.block.value.trim(),
-    area:Number(f.area.value), unit:f.unit.value, planted:Number(f.planted.value), survived:Number(f.survived.value), note:f.note.value.trim()});
+  DB.surveyRecords.push({date:f.date.value, plantDate:f.plantDate.value, forest:f.forest.value.trim(), block:f.block.value.trim(),
+    plot:f.plot.value.trim(), plotArea:Math.max(1,+f.plotArea.value||500), alive:Math.max(0,+f.alive.value||0),
+    dead:Math.max(0,+f.dead.value||0), heights:f.heights.value.trim()});
   save(); renderSeedling();
+}
+function surveyRow(x,i){
+  const r = surveyCalc(x);
+  return `<tr>
+    <td>${esc(x.date)}</td><td>${esc((x.forest||"")+(x.block?" · "+x.block:""))}</td><td>${esc(x.plot||"")}</td>
+    <td>${x.plotArea}</td><td>${r.alive}</td><td>${r.dead}</td><td>${r.total}</td>
+    <td style="color:var(--green);font-weight:600">${r.rate.toFixed(1)}%</td>
+    <td>${fmtNum(r.haNum)}</td>
+    <td>${r.avgH==null?"—":r.avgH.toFixed(2)}</td>
+    <td>${r.perM==null?"—":r.perM.toFixed(2)}</td>
+    <td>${r.sd==null?"—":r.sd.toFixed(2)}</td>
+    <td style="color:${gradeColor(r.X)};font-weight:600">${r.X}</td>
+    <td><button class="btn danger" onclick="delRec('surveyRecords',${i})">删</button></td></tr>`;
+}
+/* ---------- 多年林蓄积量调查（预留） ---------- */
+function renderVolumeSurvey(){
+  view.innerHTML += `
+    <div class="card" style="text-align:center;padding:44px 20px">
+      <div style="font-size:30px;margin-bottom:10px">🌲</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">多年林蓄积量调查（预留板块）</div>
+      <div style="font-size:13px;color:var(--sub);line-height:1.9">功能开发中：待提供多年林蓄积量调查表模板（胸径、树高、单株材积、公顷蓄积量等）后，<br>本板块将按模板补充录入界面与自动计算逻辑。</div>
+    </div>`;
 }
 
 /* ================= 验收资料台账 ================= */
