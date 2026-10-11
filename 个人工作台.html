@@ -180,8 +180,15 @@ function load(){
   const VER = 8;
   if(window.SEED_DATA && DB._seedVer !== VER){
     // 版本7：桌面软件版首次启动——迁移网页版完整数据（软件版带 assets/user-data.js，网页版无此文件自动跳过）
+    // 修复 v1.8.2：USER_DATA 是打包时携带的历史快照，升级时若整键覆盖会清掉用户更新数据；
+    // 改为"仅补空键"，已有数据一律保留。
     if(window.USER_DATA){
-      Object.keys(USER_DATA).forEach(k=>{ if(k==="_seedVer") return; DB[k] = USER_DATA[k]; });
+      Object.keys(USER_DATA).forEach(k=>{
+        if(k==="_seedVer") return;
+        const cur = DB[k];
+        const empty = cur===undefined || cur===null || (Array.isArray(cur)&&!cur.length) || (typeof cur==='object' && !Array.isArray(cur) && Object.keys(cur).length===0);
+        if(empty) DB[k] = USER_DATA[k];
+      });
       Object.keys(SEED_DATA).forEach(k=>{ if(!DB[k] || !Array.isArray(DB[k]) || !DB[k].length) DB[k] = SEED_DATA[k]; });
     }
     Object.keys(SEED_DATA).forEach(k=>{
