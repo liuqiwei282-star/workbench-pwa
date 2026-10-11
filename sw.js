@@ -1,5 +1,5 @@
 /* Service Worker：离线缓存 app shell，手机没网也能打开已缓存页面 */
-const CACHE = "workbench-v1";
+const CACHE = "workbench-v2";
 const ASSETS = [
   "./",
   "./个人工作台.html",
