@@ -2508,6 +2508,7 @@ function weekDone(i){
 /* ================= 蓄积量调查 ================= */
 let seedlingTab = "new";      // new=新造林保存率调查 | old=多年林蓄积量调查(预留)
 let surveyEditBlock = -1;     // 正在编辑地块信息的地块索引
+let surveyOpenPlots = {};     // 地块索引 → 样地区是否展开（默认收起）
 const SURVEY_ROW_CN = ["一","二","三","四","五","六","七","八"];
 function renderSeedling(){
   const tabs = [["new","新造林保存率调查"],["old","多年林蓄积量调查"]];
@@ -2569,9 +2570,15 @@ function gradeOf(o){
 }
 function gradeColor(g){ return g==="好"?"var(--green)":g==="中"?"var(--orange)":"var(--red)"; }
 /* ---------- 新造林保存率调查 ---------- */
+/* 标准密度：株行距默认 4×1.5m → 1667 株/ha，可在地块里改 */
+function stdDensity(b){
+  const ts = b && +b.treeSpacing>0 ? +b.treeSpacing : 4;
+  const rs = b && +b.rowSpacing>0 ? +b.rowSpacing : 1.5;
+  return {ts, rs, d: 10000/(ts*rs)};
+}
 function renderNewSurvey(){
   view.innerHTML += `
-    <div class="card" style="font-size:12px;color:var(--sub);line-height:1.8">录入说明：每个地块建一条记录，地块内按需添加样地（每 10 公顷设 1 个 500㎡ 样地）。每个样地固定 8 行，每行填<b>存活棵数 / 死亡棵数</b>；株数最多的那一行（如第3、4行）再填<b>树高总和（米）</b>，自动算出平均树高。底部<b>地块汇总</b>=所有样地合计后的最终数据。均匀度评级需逐株树高，当前总高度模式不参与。</div>
+    <div class="card" style="font-size:12px;color:var(--sub);line-height:1.8">录入说明：每个地块建一条记录，地块内按需添加样地（每 10 公顷设 1 个 500㎡ 样地）。每个样地固定 8 行，每行填<b>存活棵数 / 死亡棵数</b>；株数最多的那一行（如第3、4行）再填<b>树高总和（米）</b>，自动算出平均树高。底部<b>地块汇总</b>=所有样地合计后的最终数据，并对照标准株行距（默认 4×1.5m，标准密度 1667 株/ha，可在新建/编辑地块时修改）显示实测密度偏差，±10% 内为绿色提示。均匀度评级需逐株树高，当前总高度模式不参与。</div>
     <div class="card">
       <form onsubmit="addSurveyBlock(event)">
         <div class="field"><label>调查日期</label><input type="date" name="date" value="${todayStr()}" required></div>
@@ -2579,6 +2586,8 @@ function renderNewSurvey(){
         <div class="field"><label>林场</label><input name="forest" list="forestList" required></div>
         <div class="field"><label>地块号</label><input name="block" required placeholder="如：S04-G1-25-25"></div>
         <div class="field"><label>样地面积㎡</label><input type="number" step="1" name="plotArea" value="500"></div>
+        <div class="field"><label>株距m</label><input type="number" step="0.1" name="treeSpacing" value="4"></div>
+        <div class="field"><label>行距m</label><input type="number" step="0.1" name="rowSpacing" value="1.5"></div>
         <div class="field" style="align-self:end"><button class="btn primary" type="submit">+ 新建地块</button></div>
       </form>
     </div>`;
@@ -2592,30 +2601,46 @@ function renderNewSurvey(){
 function surveyBlockCard(b, i){
   const agg = blockAgg(b); const g = gradeOf(agg);
   const plots = b.plots||[];
+  const std = stdDensity(b);
+  const open = !!surveyOpenPlots[i];
   return `
   <div class="card" style="margin-bottom:14px">
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
       <b style="font-size:15px">地块 ${esc(b.block||"—")}</b>
-      <span style="font-size:12px;color:var(--sub)">${esc(b.forest||"")} · 调查 ${esc(b.date||"")} · 种植 ${esc(b.plantDate||"")} · 样地面积 ${b.plotArea||500}㎡ · ${plots.length} 个样地</span>
+      <span style="font-size:12px;color:var(--sub)">${esc(b.forest||"")} · 调查 ${esc(b.date||"")} · 种植 ${esc(b.plantDate||"")} · 样地面积 ${b.plotArea||500}㎡ · 标准 ${std.ts}×${std.rs}m · ${plots.length} 个样地</span>
       <span style="flex:1"></span>
       <button class="btn" onclick="surveyEditToggle(${i})">编辑</button>
       <button class="btn" onclick="addPlotTo(${i})">+ 添加样地</button>
+      <button class="btn" id="pt_${i}" onclick="surveyTogglePlots(${i})">${open?"收起样地":"展开样地"}（${plots.length}）</button>
       <button class="btn danger" onclick="delSurveyBlock(${i})">删</button>
     </div>
     ${surveyEditBlock===i? surveyBlockEditForm(b,i) : ""}
-    ${plots.map((p,pi)=>surveyPlotCard(b,i,p,pi)).join("")}
+    <div id="plots_${i}" style="display:${open?"block":"none"}">
+      ${plots.map((p,pi)=>surveyPlotCard(b,i,p,pi)).join("")}
+    </div>
     ${blockSummaryHTML(b)}
   </div>`;
 }
+function surveyTogglePlots(i){
+  surveyOpenPlots[i] = !surveyOpenPlots[i];
+  const el = document.getElementById('plots_'+i);
+  if(el) el.style.display = surveyOpenPlots[i]? 'block' : 'none';
+  const btn = document.getElementById('pt_'+i);
+  if(btn) btn.textContent = (surveyOpenPlots[i]?'收起样地':'展开样地')+'（'+(DB.surveyPlots[i]?DB.surveyPlots[i].plots.length:0)+'）';
+}
 function blockSummaryHTML(b){
   const agg = blockAgg(b); const g = gradeOf(agg);
+  const std = stdDensity(b);
+  const pct = (agg.haNum>0 && std.d)? (agg.haNum-std.d)/std.d*100 : null;
+  const pctColor = pct==null? "var(--sub)" : (Math.abs(pct)<=10? "var(--green)" : (Math.abs(pct)<=20? "var(--orange)" : "var(--red)"));
   return `
   <div style="margin-top:10px;padding:10px 12px;background:var(--blue-soft);border-radius:8px">
     <div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px">▣ 地块汇总（${agg.plotCount} 个样地合计 · 最终数据）</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:13px">
       <span style="background:#fff;border-radius:6px;padding:4px 8px">调查 <b>${agg.total}</b> 株 · 成活 <b>${agg.alive}</b> · 死亡 <b>${agg.dead}</b></span>
       <span style="background:#fff;border-radius:6px;padding:4px 8px">保存率 <b style="color:var(--green)">${agg.rate.toFixed(1)}%</b></span>
-      <span style="background:#fff;border-radius:6px;padding:4px 8px">公顷株数 <b>${fmtNum(agg.haNum)}</b> 株/ha</span>
+      <span style="background:#fff;border-radius:6px;padding:4px 8px">实测密度 <b>${fmtNum(agg.haNum)}</b> 株/ha</span>
+      <span style="background:#fff;border-radius:6px;padding:4px 8px">标准密度 <b>${fmtNum(std.d)}</b> 株/ha（${std.ts}×${std.rs}m）· 偏差 <b style="color:${pctColor}">${pct==null?"—":(pct>=0?"+":"")+pct.toFixed(1)+"%"}</b></span>
       <span style="background:#fff;border-radius:6px;padding:4px 8px">平均树高 <b>${agg.avgH==null?"—":agg.avgH.toFixed(2)}</b> m</span>
       <span style="background:#fff;border-radius:6px;padding:4px 8px">月均树高 <b>${agg.perM==null?"—":agg.perM.toFixed(2)}</b> m/月</span>
       <span style="background:#fff;border-radius:6px;padding:4px 8px">生长 <b>${agg.months==null?"—":agg.months.toFixed(2)}</b> 月</span>
@@ -2694,12 +2719,15 @@ function plotAutoSave(i, pi){
 /* 地块 / 样地操作 */
 function addSurveyBlock(e){
   e.preventDefault(); const f = e.target;
+  const i = DB.surveyPlots.length;
   DB.surveyPlots.push({date:f.date.value, plantDate:f.plantDate.value, forest:f.forest.value.trim(),
     block:f.block.value.trim(), plotArea:Math.max(1,+f.plotArea.value||500),
+    treeSpacing:Math.max(0.1,+f.treeSpacing.value||4), rowSpacing:Math.max(0.1,+f.rowSpacing.value||1.5),
     plots:[{rows:emptyRows()}]});
+  surveyOpenPlots[i] = true;   // 新建后默认展开，方便直接录入
   save(); renderSeedling();
 }
-function addPlotTo(i){ DB.surveyPlots[i].plots.push({rows:emptyRows()}); save(); renderSeedling(); }
+function addPlotTo(i){ DB.surveyPlots[i].plots.push({rows:emptyRows()}); surveyOpenPlots[i]=true; save(); renderSeedling(); }
 function delSurveyBlock(i){ if(confirm("删除整个地块（含全部样地）？")){ DB.surveyPlots.splice(i,1); save(); renderSeedling(); } }
 function delPlotOf(bi,pi){ if(confirm("删除该样地？")){ DB.surveyPlots[bi].plots.splice(pi,1); save(); renderSeedling(); } }
 function surveyEditToggle(i){ surveyEditBlock = surveyEditBlock===i? -1 : i; renderSeedling(); }
@@ -2711,6 +2739,8 @@ function surveyBlockEditForm(b,i){
       <div class="field" style="margin:0"><label>林场</label><input name="forest" list="forestList" value="${esc(b.forest||"")}"></div>
       <div class="field" style="margin:0"><label>地块号</label><input name="block" value="${esc(b.block||"")}"></div>
       <div class="field" style="margin:0"><label>样地面积㎡</label><input type="number" step="1" name="plotArea" value="${b.plotArea||500}"></div>
+      <div class="field" style="margin:0"><label>株距m</label><input type="number" step="0.1" name="treeSpacing" value="${+b.treeSpacing>0?b.treeSpacing:4}"></div>
+      <div class="field" style="margin:0"><label>行距m</label><input type="number" step="0.1" name="rowSpacing" value="${+b.rowSpacing>0?b.rowSpacing:1.5}"></div>
       <button class="btn primary" type="submit">保存</button>
       <button type="button" class="btn" onclick="surveyEditToggle(${i})">取消</button>
     </form></div>`;
@@ -2719,6 +2749,7 @@ function surveyEditSave(e,i){
   e.preventDefault(); const f = e.target; const b = DB.surveyPlots[i];
   b.date=f.date.value; b.plantDate=f.plantDate.value; b.forest=f.forest.value.trim();
   b.block=f.block.value.trim(); b.plotArea=Math.max(1,+f.plotArea.value||500);
+  b.treeSpacing=Math.max(0.1,+f.treeSpacing.value||4); b.rowSpacing=Math.max(0.1,+f.rowSpacing.value||1.5);
   surveyEditBlock=-1; save(); renderSeedling();
 }
 /* ---------- 多年林蓄积量调查（预留） ---------- */
